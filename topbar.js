@@ -338,6 +338,33 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     sync();
   }
 
+  // Pull water from Supabase on load and subscribe to real-time changes so
+  // bottles logged on another device appear instantly on any page, not just
+  // health.html. Only writes po_water_v1 — never touches other health keys.
+  (async function initWaterSync() {
+    if (!window.supabase || !TOPBAR_SUPABASE_URL || !TOPBAR_SUPABASE_KEY) return;
+    if (TOPBAR_SUPABASE_URL.indexOf('PASTE-') === 0) return;
+    const supa = window.supabase.createClient(TOPBAR_SUPABASE_URL, TOPBAR_SUPABASE_KEY);
+    function applyRemoteWater(data) {
+      if (!data || !data.po_water_v1) return;
+      const incoming = JSON.stringify(data.po_water_v1);
+      if (localStorage.getItem('po_water_v1') === incoming) return;
+      try { localStorage.setItem('po_water_v1', incoming); render(); } catch (e) {}
+    }
+    try {
+      const { data, error } = await supa
+        .from('app_state').select('data').eq('key', 'health').maybeSingle();
+      if (!error && data) applyRemoteWater(data.data);
+    } catch (e) {}
+    supa.channel('topbar_water_sync')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.health',
+      }, (payload) => {
+        if (payload.new && payload.new.data) applyRemoteWater(payload.new.data);
+      })
+      .subscribe();
+  })();
+
   function boot() {
     injectStyleAndHTML();
     const btn = document.getElementById('topbarWaterAdd');
