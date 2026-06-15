@@ -1,0 +1,402 @@
+<!--
+=====================================================
+© 2026 Rowan Thistlebrooke — All Rights Reserved
+
+Personal & Educational Use Only.
+You may view and run this code locally for learning.
+You may NOT use this code or data in a commercial
+product, redistribute it, or republish it as your own.
+=====================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Growth</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+<script src="habits-core.js"></script>
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: #050506; color: var(--text-secondary);
+  font-family: var(--font); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh; position: relative; overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(60px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(224, 118, 88, 0.16), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 50%);
+  filter: blur(40px); pointer-events: none; z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px; pointer-events: none; z-index: -1;
+}
+@keyframes drift { 0% { transform: translate3d(0,0,0); } 100% { transform: translate3d(-22px, 14px, 0); } }
+
+.page { max-width: 760px; margin: 0 auto; }
+.dash-title {
+  margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.sub { color: var(--text-tertiary); font-size: 13px; margin: 0 0 18px; }
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-bottom: 22px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 10px; display: flex; align-items: center; gap: 12px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent); }
+
+.card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 18px;
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 12px;
+}
+
+/* range segmented control */
+.seg { display: inline-flex; gap: 4px; background: rgba(255,255,255,0.04); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+.seg button {
+  padding: 8px 16px; border: none; background: none; color: var(--text-secondary);
+  font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 9px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg button.active { background: linear-gradient(180deg, #ffffff 0%, #e8e5dd 100%); color: #0a0a0b; }
+
+/* hero */
+.hero { text-align: center; }
+.hero-big { font-size: 46px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -0.03em; }
+.hero-label { color: var(--text-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 6px; }
+.hero-delta { margin-top: 12px; }
+
+/* delta chips */
+.delta { font-family: var(--font-mono); font-weight: 700; font-size: 12.5px; padding: 2px 8px; border-radius: 6px; }
+.delta.up { color: var(--success); background: rgba(107,227,164,0.12); }
+.delta.down { color: #FF8A8A; background: rgba(255,107,107,0.12); }
+.delta.flat { color: var(--text-tertiary); background: rgba(255,255,255,0.06); }
+.delta-text { color: var(--text-tertiary); font-size: 12px; }
+
+/* charts */
+.g-svg { width: 100%; height: auto; display: block; }
+.g-axis { fill: var(--text-tertiary); font-size: 9px; font-family: var(--font-mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; }
+.leg { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.leg-val { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
+
+/* category group header */
+.cat-group-head {
+  display: flex; align-items: center; gap: 8px; margin: 16px 0 8px;
+  font-size: 12px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.02em;
+}
+.cat-group-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* per-habit card */
+.g-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.g-card-name { font-weight: 700; color: var(--text-primary); font-size: 14px; }
+.hab-badge {
+  font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: var(--text-secondary);
+}
+.g-stat { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.g-stat-sub { color: var(--text-tertiary); }
+.g-thisweek { color: var(--success); font-weight: 600; }
+.g-legend-mini { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--text-tertiary); }
+.lm-bar { width: 12px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.lm-line { display: inline-block; width: 16px; border-top: 1.5px dashed rgba(255,255,255,0.6); margin-right: 5px; vertical-align: middle; }
+
+/* milestone roadmap */
+.rm { display: flex; align-items: flex-start; overflow-x: auto; padding-bottom: 6px; }
+.rm-node { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; }
+.rm-dot {
+  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; font-family: var(--font-mono);
+  border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); color: var(--text-secondary);
+}
+.rm-label { font-size: 10px; color: var(--text-tertiary); text-align: center; max-width: 60px; line-height: 1.2; }
+.rm-conn { flex: 1 0 14px; min-width: 14px; height: 2px; background: rgba(255,255,255,0.12); margin-top: 13px; }
+
+/* heatmap */
+.heat { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.heat-col { display: flex; flex-direction: column; gap: 3px; }
+.heat-cell { width: 14px; height: 14px; border-radius: 3px; background: rgba(255,255,255,0.05); border: 1px solid transparent; }
+.heat-cell.off { background: rgba(255,255,255,0.02); }
+.heat-cell.future { background: rgba(255,255,255,0.03); }
+.heat-cell.miss { background: rgba(255,138,138,0.18); }
+
+.g-empty { color: var(--text-tertiary); font-size: 13px; text-align: center; padding: 14px; }
+.g-empty a { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="dash-title">Growth</h1>
+  <p class="sub">How much more you're doing — week over week, by habit and category.</p>
+
+  <div class="seg" id="rangeSeg">
+    <button type="button" data-val="4w">4 wks</button>
+    <button type="button" data-val="12w">12 wks</button>
+    <button type="button" data-val="all">All</button>
+  </div>
+
+  <div id="growthContent"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var H = window.Habits;
+  if (!H) return;
+  function el(id) { return document.getElementById(id); }
+  var formatNum = H.formatNum;
+  var range = '12w';
+
+  function byOrder(a, b) { return (a.order || 0) - (b.order || 0); }
+  function toHex(c) { return /^#[0-9a-fA-F]{6}$/.test(c) ? c : '#76746E'; }
+  function typeLabel(t) { return t === 'simple' ? 'Measurable' : (t === 'complex' ? 'Milestones' : 'Show up'); }
+  function esc(s) { return H.escapeHtml(s); }
+  function monthDay(ds) {
+    var p = ds.split('-');
+    var mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(p[1], 10) - 1];
+    return mo + ' ' + parseInt(p[2], 10);
+  }
+  function deltaChip(d, text) {
+    var cls = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+    var sign = d > 0 ? '+' : '';
+    return '<span class="delta ' + cls + '">' + sign + formatNum(d) + '</span>' + (text ? ' <span class="delta-text">' + text + '</span>' : '');
+  }
+
+  // ---------- ranges + grouping ----------
+  function rangeWeeks() {
+    if (range === '4w') return H.weeksRange(4);
+    if (range === '12w') return H.weeksRange(12);
+    var state = H.load();
+    var earliest = null;
+    state.habits.forEach(function (h) { if (!h.archived && (!earliest || h.createdDate < earliest)) earliest = h.createdDate; });
+    if (!earliest) return H.weeksRange(4);
+    var n = H.weeksSince(H.weekStartStr(earliest), H.todayStr()) + 1;
+    return H.weeksRange(Math.max(4, Math.min(52, n)));
+  }
+  function groupsOf(state) {
+    var groups = [];
+    state.categories.slice().sort(byOrder).forEach(function (c) {
+      var items = state.habits.filter(function (h) { return !h.archived && h.categoryId === c.id; }).sort(byOrder);
+      if (items.length) groups.push({ name: c.name, color: toHex(c.color), items: items });
+    });
+    var uncat = state.habits.filter(function (h) { return !h.archived && (!h.categoryId || !H.catById(state, h.categoryId)); }).sort(byOrder);
+    if (uncat.length) groups.push({ name: 'Uncategorized', color: '#76746E', items: uncat });
+    return groups;
+  }
+
+  // ---------- svg builders ----------
+  function svgLine(series, weeks) {
+    var W = 520, Hh = 170, L = 34, R = 12, T = 12, B = 22, n = weeks.length;
+    var maxV = 1; series.forEach(function (s) { s.values.forEach(function (v) { if (v > maxV) maxV = v; }); });
+    function x(i) { return L + (n <= 1 ? (W - L - R) / 2 : (i / (n - 1)) * (W - L - R)); }
+    function y(v) { return Hh - B - (v / maxV) * (Hh - T - B); }
+    var svg = '';
+    for (var g = 0; g <= 2; g++) {
+      var val = maxV * (g / 2), gy = y(val);
+      svg += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W - R) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)"/>';
+      svg += '<text x="' + (L - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" class="g-axis">' + formatNum(val) + '</text>';
+    }
+    series.forEach(function (s) {
+      if (!s.values.length) return;
+      var d = s.values.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+      svg += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+      var li = s.values.length - 1;
+      svg += '<circle cx="' + x(li).toFixed(1) + '" cy="' + y(s.values[li]).toFixed(1) + '" r="3" fill="' + s.color + '"/>';
+    });
+    svg += '<text x="' + L + '" y="' + (Hh - 6) + '" class="g-axis">' + monthDay(weeks[0]) + '</text>';
+    svg += '<text x="' + (W - R) + '" y="' + (Hh - 6) + '" text-anchor="end" class="g-axis">' + monthDay(weeks[n - 1]) + '</text>';
+    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" class="g-svg">' + svg + '</svg>';
+  }
+  function svgBars(values, targets, color) {
+    var W = 520, Hh = 150, L = 34, R = 12, T = 12, B = 20, n = values.length;
+    var maxV = 1; values.concat(targets).forEach(function (v) { if (v > maxV) maxV = v; });
+    var step = (W - L - R) / n, bw = step * 0.6;
+    function cx(i) { return L + step * i + step / 2; }
+    function y(v) { return Hh - B - (v / maxV) * (Hh - T - B); }
+    var svg = '';
+    for (var g = 0; g <= 2; g++) {
+      var val = maxV * (g / 2), gy = y(val);
+      svg += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W - R) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)"/>';
+      svg += '<text x="' + (L - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" class="g-axis">' + formatNum(val) + '</text>';
+    }
+    values.forEach(function (v, i) {
+      var h = (v / maxV) * (Hh - T - B);
+      svg += '<rect x="' + (cx(i) - bw / 2).toFixed(1) + '" y="' + (Hh - B - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" rx="2" fill="' + color + '" opacity="0.85"/>';
+    });
+    var td = targets.map(function (v, i) { return (i ? 'L' : 'M') + cx(i).toFixed(1) + ' ' + y(v).toFixed(1); }).join(' ');
+    svg += '<path d="' + td + '" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.5" stroke-dasharray="3 3"/>';
+    return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" class="g-svg">' + svg + '</svg>';
+  }
+  function roadmapHtml(state, habit) {
+    var stages = (habit.milestone && habit.milestone.stages) || [];
+    if (!stages.length) return '<div class="g-empty">No milestones defined. <a href="habits.html">Add some →</a></div>';
+    var color = toHex(H.categoryColor(state, habit.categoryId));
+    var ci = H.currentStageIndex(state, habit);
+    var html = '<div class="rm">';
+    stages.forEach(function (st, i) {
+      var doneStage = H.stageComplete(state, habit, st);
+      if (i > 0) {
+        var prevDone = H.stageComplete(state, habit, stages[i - 1]);
+        html += '<div class="rm-conn"' + (prevDone ? ' style="background:' + color + ';"' : '') + '></div>';
+      }
+      var style = doneStage
+        ? 'style="background:' + color + ';border-color:' + color + ';color:#0a0a0b;"'
+        : (i === ci ? 'style="border-color:' + color + ';color:' + color + ';"' : '');
+      html += '<div class="rm-node"><div class="rm-dot" ' + style + '>' + (doneStage ? '✓' : (i + 1)) + '</div>'
+        + '<div class="rm-label">' + esc(st.name || ('Stage ' + (i + 1))) + '</div></div>';
+    });
+    return html + '</div>';
+  }
+  function heatmapHtml(state, habit, weeks, color) {
+    var today = H.todayStr();
+    var html = '<div class="heat">';
+    weeks.forEach(function (ws) {
+      html += '<div class="heat-col">';
+      for (var i = 0; i < 7; i++) {
+        var ds = H.addDays(ws, i), cls = 'heat-cell', style = '';
+        if (ds > today) cls += ' future';
+        else if (!H.isScheduledOn(habit, ds)) cls += ' off';
+        else if (H.isDoneOn(state, habit, ds)) { style = 'style="background:' + color + ';border-color:' + color + ';"'; }
+        else cls += ' miss';
+        html += '<div class="' + cls + '" ' + style + ' title="' + ds + '"></div>';
+      }
+      html += '</div>';
+    });
+    return html + '</div>';
+  }
+
+  // ---------- sections ----------
+  function totalCompletions(state, weekStart) {
+    var t = 0;
+    state.habits.forEach(function (h) { if (!h.archived) t += H.habitWeekCompletions(state, h, weekStart); });
+    return t;
+  }
+  function renderHero(state) {
+    var thisW = H.weekStartStr(H.todayStr()), lastW = H.addDays(thisW, -7);
+    var cur = totalCompletions(state, thisW), prev = totalCompletions(state, lastW);
+    return '<div class="card hero">'
+      + '<div class="hero-big">' + cur + '</div>'
+      + '<div class="hero-label">completions this week</div>'
+      + '<div class="hero-delta">' + deltaChip(cur - prev, 'vs last week (' + prev + ')') + '</div></div>';
+  }
+  function renderCategoryTrend(state, weeks) {
+    var groups = groupsOf(state);
+    if (!groups.length) return '';
+    var series = groups.map(function (g) {
+      return {
+        color: g.color, name: g.name,
+        values: weeks.map(function (w) { return g.items.reduce(function (s, h) { return s + H.habitWeekCompletions(state, h, w); }, 0); })
+      };
+    });
+    var legend = series.map(function (s) {
+      var cur = s.values[s.values.length - 1] || 0, prev = s.values[s.values.length - 2] || 0;
+      return '<div class="leg"><span class="leg-dot" style="background:' + s.color + '"></span>' + esc(s.name)
+        + ' <span class="leg-val">' + cur + '</span> ' + deltaChip(cur - prev, '') + '</div>';
+    }).join('');
+    return '<div class="section"><div class="section-title">Activity by category</div>'
+      + '<div class="card">' + svgLine(series, weeks) + '<div class="legend">' + legend + '</div></div></div>';
+  }
+  function renderHabitCard(state, h, weeks, color) {
+    var head = '<div class="g-card-head"><span class="g-card-name">' + esc(h.name) + '</span><span class="hab-badge">' + typeLabel(h.type) + '</span></div>';
+    var body = '';
+    if (h.type === 'simple') {
+      var vals = weeks.map(function (w) { return H.weeklySessionTotal(state, h, w); });
+      var tgts = weeks.map(function (w) { return H.currentTarget(h, w) || 0; });
+      var cur = vals[vals.length - 1] || 0, prev = vals[vals.length - 2] || 0;
+      body = '<div class="g-stat"><strong style="color:var(--text-primary)">' + formatNum(cur) + ' ' + esc(h.unit) + '</strong> '
+        + '<span class="g-stat-sub">this week</span> ' + deltaChip(Math.round((cur - prev) * 100) / 100, 'vs last') + '</div>'
+        + svgBars(vals, tgts, color)
+        + '<div class="g-legend-mini"><span><span class="lm-bar" style="background:' + color + '"></span>weekly total</span><span><span class="lm-line"></span>target</span></div>';
+    } else if (h.type === 'complex') {
+      var thisW = H.weekStartStr(H.todayStr());
+      var wc = H.milestoneWeekCounts(state, h, thisW);
+      var prog = H.milestoneProgress(state, h);
+      var tw = (wc.subSteps || wc.stages)
+        ? ' <span class="g-thisweek">+' + wc.subSteps + ' step' + (wc.subSteps === 1 ? '' : 's')
+          + (wc.stages ? (', +' + wc.stages + ' stage' + (wc.stages === 1 ? '' : 's')) : '') + ' this week</span>'
+        : '';
+      body = '<div class="g-stat"><strong style="color:var(--text-primary)">' + prog.doneStages + '/' + prog.totalStages + ' stages</strong> '
+        + '<span class="g-stat-sub">· ' + prog.percent + '%</span>' + tw + '</div>'
+        + roadmapHtml(state, h);
+    } else {
+      var stt = H.streakStats(state, h, weeks[0], H.todayStr());
+      body = '<div class="g-stat"><strong style="color:var(--text-primary)">' + Math.round(stt.rate * 100) + '%</strong> '
+        + '<span class="g-stat-sub">completion</span> · 🔥 ' + stt.current + ' streak '
+        + '<span class="g-stat-sub">(best ' + stt.longest + ')</span></div>'
+        + heatmapHtml(state, h, weeks, color);
+    }
+    return '<div class="card">' + head + body + '</div>';
+  }
+  function renderHabitGroups(state, weeks) {
+    var groups = groupsOf(state);
+    var html = '<div class="section"><div class="section-title">Per-habit progress</div>';
+    groups.forEach(function (g) {
+      html += '<div class="cat-group-head"><span class="cat-group-dot" style="background:' + g.color + '"></span>' + esc(g.name) + '</div>';
+      g.items.forEach(function (h) { html += renderHabitCard(state, h, weeks, g.color); });
+    });
+    return html + '</div>';
+  }
+
+  function render() {
+    var state = H.load();
+    var active = state.habits.filter(function (h) { return !h.archived; });
+    if (!active.length) {
+      el('growthContent').innerHTML = '<div class="card"><div class="g-empty">No habits yet. <a href="habits.html">Create your first habit →</a></div></div>';
+      return;
+    }
+    var weeks = rangeWeeks();
+    el('growthContent').innerHTML = renderHero(state) + renderCategoryTrend(state, weeks) + renderHabitGroups(state, weeks);
+  }
+
+  // ---------- wiring ----------
+  el('rangeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    range = b.getAttribute('data-val');
+    [].forEach.call(el('rangeSeg').querySelectorAll('button'), function (x) { x.classList.toggle('active', x === b); });
+    render();
+  });
+  [].forEach.call(el('rangeSeg').querySelectorAll('button'), function (x) { x.classList.toggle('active', x.getAttribute('data-val') === range); });
+
+  window.addEventListener('habits-changed', render);
+  window.addEventListener('storage', function (e) { if (!e.key || e.key === H.LS_KEY) render(); });
+
+  render();
+
+  if (typeof initCloudSync === 'function') {
+    initCloudSync({
+      appKey: 'habits',
+      syncedKeys: ['po_habits_v1'],
+      onApplied: function () { window.dispatchEvent(new CustomEvent('habits-changed')); }
+    });
+  }
+});
+</script>
+</body>
+</html>

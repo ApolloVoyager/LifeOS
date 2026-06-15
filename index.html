@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
+<script src="habits-core.js"></script>
 <style>
 :root {
   --text-primary: #FAFAFA;
@@ -593,6 +594,53 @@ body::after {
   .gm-card { padding: 16px; }
   .gm-progress-num { font-size: 36px; }
 }
+
+/* ===== Habits ===== */
+.habits-manage {
+  color: var(--text-secondary); font-size: 12px; font-weight: 600; text-decoration: none;
+  align-self: flex-start; white-space: nowrap; padding: 5px 11px; border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.habits-manage:hover { color: var(--text-primary); background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.22); }
+.habits-manage-top { display: inline-block; margin: 0 0 12px; }
+.habit-row .habit-text { cursor: default; }
+.habit-cat-pill {
+  font-size: 10px; font-weight: 700; padding: 3px 9px;
+  border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+}
+.habit-counter {
+  display: flex; align-items: center; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; overflow: hidden;
+}
+.habit-step {
+  width: 30px; height: 28px; border: none; background: rgba(255,255,255,0.05);
+  color: var(--text-primary); font-size: 16px; line-height: 1; cursor: pointer; font-family: inherit;
+}
+.habit-step:hover { background: rgba(255,255,255,0.10); }
+.habit-count-val {
+  min-width: 40px; text-align: center; font-family: var(--font-mono);
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+}
+.habit-complex { flex-direction: column; align-items: stretch; gap: 0; }
+.habit-top { display: flex; align-items: center; gap: 12px; }
+.ms-toggle {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 9px; border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+}
+.ms-toggle:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+.milestone-panel {
+  margin-top: 10px; padding: 12px 12px 6px;
+  background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px;
+}
+.ms-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 700; margin-bottom: 10px; }
+.ms-stage-title { font-size: 13px; color: var(--text-primary); font-weight: 600; margin-bottom: 8px; }
+.ms-substep { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; }
+.ms-substep-name { font-size: 13px; color: var(--text-secondary); }
+.ms-allmilestones { font-size: 14px; color: var(--success); font-weight: 700; padding: 4px 0; }
+.ms-edit-link { color: var(--text-secondary); font-size: 12px; text-decoration: none; }
+.ms-edit-link:hover { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -641,6 +689,7 @@ body::after {
 
   <div class="section">
     <div class="section-title">To Do List</div>
+    <a class="habits-manage habits-manage-top" href="habits.html">⚙ Manage habits</a>
 
     <!-- TODAY -->
     <div class="gm-card" id="gmCardToday">
@@ -770,6 +819,7 @@ body::after {
       if (dateStr >= todayDateStr) return;
       const old = getGoals(k);
       old.forEach(g => {
+        if (g.habitId) return;
         if (!g.done && g.text && !texts.has(g.text)) {
           today.push({ text: g.text, done: false });
           texts.add(g.text);
@@ -797,7 +847,7 @@ body::after {
       .sort();
     keys.forEach(dateStr => {
       if (s.lastProcessedDate && dateStr <= s.lastProcessedDate) return;
-      const list = getGoals('goals:' + dateStr);
+      const list = getGoals('goals:' + dateStr).filter(g => !g.habitId);
       if (list.length === 0) { /* don't break the streak on empty days */ }
       else if (list.every(g => g.done)) s.count += 1;
       else s.count = 0;
@@ -1125,7 +1175,8 @@ body::after {
     card.classList.toggle('gm-all-done', total > 0 && done === total);
 
     const pushBtn = document.getElementById('gmPushBtn');
-    pushBtn.style.display = (total > 0 && done < total) ? 'block' : 'none';
+    const pushable = goals.filter(g => !g.done && !g.habitId).length;
+    pushBtn.style.display = (pushable > 0) ? 'block' : 'none';
   }
 
   function renderStreak() {
@@ -1147,7 +1198,7 @@ body::after {
     const reload = () => (key === todayKey() ? loadToday() : loadTomorrow());
 
     const visible = goals.length > 5 ? goals.slice(0, 5) : goals;
-    visible.forEach((g, i) => listEl.appendChild(buildGoalRow(g, i, key, readOnly, reload)));
+    visible.forEach((g, i) => listEl.appendChild(buildRow(g, i, key, readOnly, reload)));
 
     if (goals.length > 5) {
       let expanded = false;
@@ -1162,7 +1213,7 @@ body::after {
         expanded = !expanded;
         if (expanded) {
           goals.slice(5).forEach((g, i) => {
-            const row = buildGoalRow(g, i + 5, key, readOnly, reload);
+            const row = buildRow(g, i + 5, key, readOnly, reload);
             listEl.insertBefore(row, toggle);
           });
         } else {
@@ -1186,10 +1237,250 @@ body::after {
     renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), true);
   }
 
+  // ---------- Habits (Phase A) ----------
+  function habitHexA(hex, a) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return 'rgba(118,116,110,' + a + ')';
+    return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')';
+  }
+  const expandedHabits = new Set();
+
+  function setHabitCount(habitId, n) {
+    const state = window.Habits.load();
+    window.Habits.setCount(state, habitId, getActiveDateString(), n);
+    window.Habits.save(state); // -> 'habits-changed' -> ensureTodayHabits() + loadToday()
+  }
+  function celebrateMilestone(habit, stage, color) {
+    const H = window.Habits;
+    const state = H.load();
+    const stages = (habit.milestone && habit.milestone.stages) || [];
+    const allDone = H.currentStageIndex(state, habit) >= stages.length;
+    if (H.celebrate) {
+      H.celebrate({
+        color: color,
+        title: allDone ? '🏁 Habit complete!' : '🎉 Milestone reached!',
+        subtitle: allDone ? habit.name : (stage && stage.name ? stage.name : 'Stage complete')
+      });
+    }
+  }
+  function toggleSubStep(habitId, subStepId, checked) {
+    const H = window.Habits;
+    const state = H.load();
+    const habit = H.habitById(state, habitId);
+    if (!habit) return;
+    const res = H.setSubStep(state, habit, subStepId, checked, getActiveDateString());
+    H.save(state);
+    if (!checked) return;
+    const color = H.categoryColor(state, habit.categoryId);
+    if (res && res.stageCompleted) {
+      celebrateMilestone(habit, res.stage, color); // major: burst
+    } else if (H.celebrate) {
+      let label = '';
+      const stage = res && res.stage;
+      if (stage) { const ss = (stage.subSteps || []).filter(x => x.id === subStepId)[0]; if (ss) label = ss.name; }
+      H.celebrate({ mini: true, color: color, label: label || 'Step done' }); // minor: mini pill
+    }
+  }
+  function toggleStageDirect(habitId, stageId, checked) {
+    const H = window.Habits;
+    const state = H.load();
+    const habit = H.habitById(state, habitId);
+    if (!habit) return;
+    H.setStage(state, habit, stageId, checked, getActiveDateString());
+    H.save(state);
+    if (checked) {
+      const stage = ((habit.milestone && habit.milestone.stages) || []).filter(s => s.id === stageId)[0];
+      celebrateMilestone(habit, stage, H.categoryColor(state, habit.categoryId));
+    }
+  }
+  function buildMilestoneCheckRow(checked, labelText, onToggle) {
+    const row = document.createElement('label');
+    row.className = 'ms-substep';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'gm-check'; cb.checked = checked;
+    cb.addEventListener('change', () => onToggle(cb.checked));
+    const name = document.createElement('span');
+    name.className = 'ms-substep-name'; name.textContent = labelText;
+    if (checked) name.style.textDecoration = 'line-through';
+    row.appendChild(cb); row.appendChild(name);
+    return row;
+  }
+  function buildMilestonePanel(habit, state) {
+    const H = window.Habits;
+    const panel = document.createElement('div');
+    panel.className = 'milestone-panel';
+    const stages = (habit.milestone && habit.milestone.stages) || [];
+    const prog = H.milestoneProgress(state, habit);
+
+    const head = document.createElement('div');
+    head.className = 'ms-head';
+    head.textContent = stages.length
+      ? ('Milestones · ' + prog.doneStages + '/' + prog.totalStages + ' stages · ' + prog.percent + '%')
+      : 'No milestones defined yet';
+    panel.appendChild(head);
+
+    if (!stages.length) {
+      const a = document.createElement('a');
+      a.href = 'habits.html'; a.className = 'ms-edit-link'; a.textContent = 'Add milestones →';
+      panel.appendChild(a);
+      return panel;
+    }
+    const ci = H.currentStageIndex(state, habit);
+    if (ci >= stages.length) {
+      const all = document.createElement('div');
+      all.className = 'ms-allmilestones'; all.textContent = '🏁 All milestones complete!';
+      panel.appendChild(all);
+      return panel;
+    }
+    const stage = stages[ci];
+    const title = document.createElement('div');
+    title.className = 'ms-stage-title';
+    title.textContent = 'Stage ' + (ci + 1) + ' of ' + stages.length + ': ' + (stage.name || 'Untitled');
+    panel.appendChild(title);
+
+    const map = H.milestoneMap(state, habit.id);
+    if (stage.subSteps && stage.subSteps.length) {
+      stage.subSteps.forEach(ss => {
+        panel.appendChild(buildMilestoneCheckRow(!!map[ss.id], ss.name,
+          (checked) => toggleSubStep(habit.id, ss.id, checked)));
+      });
+    } else {
+      panel.appendChild(buildMilestoneCheckRow(!!map[stage.id], (stage.name || 'Stage') + ' — mark complete',
+        (checked) => toggleStageDirect(habit.id, stage.id, checked)));
+    }
+    return panel;
+  }
+  function buildHabitRow2(goal, idx, key, reload) {
+    const H = window.Habits;
+    const li = document.createElement('li');
+    li.className = 'gm-row habit-row';
+    li.dataset.idx = String(idx);
+    const state = H.load();
+    const active = getActiveDateString();
+    const habit = H.habitById(state, goal.habitId);
+    if (!habit) return li;
+
+    const color = H.categoryColor(state, habit.categoryId);
+    li.style.boxShadow = 'inset 3px 0 0 0 ' + color;
+    const req = H.requiredToday(habit);
+    const count = H.getCount(state, habit.id, active);
+    const done = count >= req;
+    if (done) li.classList.add('gm-row-done');
+
+    const isComplex = habit.type === 'complex';
+    const top = isComplex ? document.createElement('div') : li;
+    if (isComplex) { li.classList.add('habit-complex'); top.className = 'habit-top'; }
+
+    const handle = document.createElement('span');
+    handle.className = 'gm-handle'; handle.textContent = '⋮⋮';
+    top.appendChild(handle);
+
+    if (req > 1) {
+      const ctr = document.createElement('div');
+      ctr.className = 'habit-counter';
+      const minus = document.createElement('button');
+      minus.type = 'button'; minus.className = 'habit-step'; minus.textContent = '−';
+      minus.addEventListener('click', () => setHabitCount(habit.id, Math.max(0, count - 1)));
+      const val = document.createElement('span');
+      val.className = 'habit-count-val'; val.textContent = count + '/' + req;
+      const plus = document.createElement('button');
+      plus.type = 'button'; plus.className = 'habit-step'; plus.textContent = '+';
+      plus.addEventListener('click', () => setHabitCount(habit.id, Math.min(req, count + 1)));
+      ctr.appendChild(minus); ctr.appendChild(val); ctr.appendChild(plus);
+      top.appendChild(ctr);
+    } else {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'gm-check'; cb.checked = done;
+      cb.addEventListener('change', () => setHabitCount(habit.id, cb.checked ? req : 0));
+      top.appendChild(cb);
+    }
+
+    const text = document.createElement('span');
+    text.className = 'gm-text habit-text';
+    let label = habit.name;
+    if (habit.type === 'simple') {
+      label += ' · ' + H.formatNum(H.currentTarget(habit, active)) + ' ' + habit.unit;
+    }
+    text.textContent = label;
+    top.appendChild(text);
+
+    if (isComplex) {
+      const prog = H.milestoneProgress(state, habit);
+      const open = expandedHabits.has(habit.id);
+      const mtoggle = document.createElement('button');
+      mtoggle.type = 'button';
+      mtoggle.className = 'ms-toggle';
+      mtoggle.textContent = (open ? '▾ ' : '▸ ') + prog.doneSteps + '/' + prog.totalSteps;
+      mtoggle.title = 'Milestones';
+      mtoggle.addEventListener('click', () => {
+        if (expandedHabits.has(habit.id)) expandedHabits.delete(habit.id);
+        else expandedHabits.add(habit.id);
+        loadToday();
+      });
+      top.appendChild(mtoggle);
+    }
+
+    const pill = document.createElement('span');
+    pill.className = 'habit-cat-pill';
+    pill.textContent = H.categoryName(state, habit.categoryId);
+    pill.style.color = color;
+    pill.style.background = habitHexA(color, 0.15);
+    top.appendChild(pill);
+
+    if (isComplex) {
+      li.appendChild(top);
+      if (expandedHabits.has(habit.id)) li.appendChild(buildMilestonePanel(habit, state));
+    }
+
+    wireDragReorder(li, null, key, reload);
+    return li;
+  }
+  function buildRow(g, idx, key, readOnly, reload) {
+    return (g && g.habitId) ? buildHabitRow2(g, idx, key, reload) : buildGoalRow(g, idx, key, readOnly, reload);
+  }
+  // Keep today's goal list in sync with scheduled habits (completion truth lives in the habit log).
+  function ensureTodayHabits() {
+    if (!window.Habits) return;
+    const H = window.Habits;
+    const state = H.load();
+    const active = getActiveDateString();
+    const key = todayKey();
+    const scheduled = H.scheduledHabitsOn(state, active);
+    const byId = {};
+    scheduled.forEach(h => { byId[h.id] = h; });
+
+    let list = getGoals(key);
+    let changed = false;
+
+    // drop habit entries whose habit is no longer scheduled / exists
+    const kept = list.filter(g => !g.habitId || byId[g.habitId]);
+    if (kept.length !== list.length) { list = kept; changed = true; }
+
+    // add entries for newly-scheduled habits (at the top, in category order)
+    const present = {};
+    list.forEach(g => { if (g.habitId) present[g.habitId] = true; });
+    const additions = [];
+    scheduled.forEach(h => {
+      if (!present[h.id]) additions.push({ habitId: h.id, text: h.name, done: H.isDoneOn(state, h, active) });
+    });
+    if (additions.length) { list = additions.concat(list); changed = true; }
+
+    // sync done + name from the source of truth
+    list.forEach(g => {
+      if (!g.habitId) return;
+      const h = byId[g.habitId]; if (!h) return;
+      const d = H.isDoneOn(state, h, active);
+      if (g.done !== d) { g.done = d; changed = true; }
+      if (g.text !== h.name) { g.text = h.name; changed = true; }
+    });
+
+    if (changed) setGoals(key, list);
+  }
+
   // ---------- Push remaining ----------
   document.getElementById('gmPushBtn').addEventListener('click', () => {
     const today    = getGoals(todayKey());
-    const remaining = today.filter(g => !g.done);
+    const remaining = today.filter(g => !g.done && !g.habitId);
     if (remaining.length === 0) return;
     if (!confirm('Move ' + remaining.length + ' unchecked goal' + (remaining.length === 1 ? '' : 's') + ' to tomorrow?')) return;
     const tomorrow = getGoals(tomorrowKey());
@@ -1198,7 +1489,7 @@ body::after {
       if (!seen.has(g.text)) { tomorrow.push({ text: g.text, done: false }); seen.add(g.text); }
     });
     setGoals(tomorrowKey(), tomorrow);
-    setGoals(todayKey(), today.filter(g => g.done));
+    setGoals(todayKey(), today.filter(g => g.done || g.habitId));
     loadToday(); loadTomorrow();
   });
 
@@ -1294,6 +1585,7 @@ body::after {
   // ---------- Boot ----------
   rollover();
   processStreak();
+  ensureTodayHabits();
   loadToday();
   loadTomorrow();
   renderStreak();
@@ -1303,8 +1595,9 @@ body::after {
 
   // Re-render when storage changes from another tab (or our bridged parent).
   window.addEventListener('storage', () => {
-    loadToday(); loadTomorrow(); renderStreak();
+    ensureTodayHabits(); loadToday(); loadTomorrow(); renderStreak();
   });
+  window.addEventListener('habits-changed', () => { ensureTodayHabits(); loadToday(); });
 })();
 </script>
 <script>
@@ -1316,6 +1609,13 @@ document.addEventListener('DOMContentLoaded', function () {
     onApplied: function () {
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
+    }
+  });
+  initCloudSync({
+    appKey: 'habits',
+    syncedKeys: ['po_habits_v1'],
+    onApplied: function () {
+      window.dispatchEvent(new CustomEvent('habits-changed'));
     }
   });
 });
