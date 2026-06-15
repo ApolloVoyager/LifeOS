@@ -245,11 +245,18 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   }
   function classifyStatus(done, total) {
     if (total === 0) return 'idle';
-    if (done >= total) return 'good';
-    if (done >= total * 0.5) return 'warn';
-    const h = new Date().getHours();
+    const now = new Date();
+    const h = now.getHours();
+    // Red: under 50% after 6 PM (unchanged)
     if (h >= 18 && done < total * 0.5) return 'miss';
-    return 'warn';
+    // Blue if on pace, gold if behind — based on elapsed waking hours
+    // Defaults until waking hours become user-configurable
+    const wakeHour = 7;
+    const sleepHour = 23;
+    const totalWakingHours = sleepHour - wakeHour;
+    const elapsed = Math.max(0, Math.min((h + now.getMinutes() / 60) - wakeHour, totalWakingHours));
+    const expected = (elapsed / totalWakingHours) * total;
+    return done >= expected ? 'good' : 'warn';
   }
   function setPillStatus(pillEl, status) {
     pillEl.classList.remove('good', 'warn', 'miss');
