@@ -108,13 +108,17 @@
 .topbar-water-add.flash {
   background: linear-gradient(180deg, rgba(125, 211, 252, 0.65), rgba(110, 231, 183, 0.65));
 }
+.topbar-water-icon {
+  font-size: 15px; line-height: 1; flex-shrink: 0;
+}
 
 @media (max-width: 480px) {
-  .topbar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); gap: 4px; }
-  .topbar-pill, .topbar-water-pill { padding: 7px 9px; gap: 5px; }
-  .topbar-pill-label { font-size: 9px; letter-spacing: 0.10em; }
-  .topbar-pill-count { font-size: 11px; }
-  .topbar-water-add { width: 32px; font-size: 16px; }
+  .topbar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); gap: 3px; }
+  .topbar-pill, .topbar-water-pill { padding: 6px 7px; gap: 4px; }
+  .topbar-pill-label { font-size: 8px; letter-spacing: 0.08em; }
+  .topbar-pill-count { font-size: 10px; }
+  .topbar-water-add { width: 26px; font-size: 14px; }
+  .topbar-water-den { display: none; }
 }
 @media (max-width: 380px) {
   .topbar-pill-label { display: none; }
@@ -181,9 +185,8 @@ body.topbar-modal-open {
   </a>
   <div class="topbar-water-wrap">
     <a href="health.html#water" class="topbar-water-pill" id="topbarWater">
-      <span class="topbar-pill-dot"></span>
-      <span class="topbar-pill-label">WATER</span>
-      <span class="topbar-pill-count" id="topbarWaterCount">—/—</span>
+      <span class="topbar-water-icon">💧</span>
+      <span class="topbar-pill-count"><span id="topbarWaterNum">—</span><span class="topbar-water-den" id="topbarWaterDen">/—</span></span>
     </a>
     <button class="topbar-water-add" id="topbarWaterAdd" aria-label="Log one drink" type="button">+</button>
   </div>
@@ -303,8 +306,8 @@ body.topbar-modal-open {
       g.total ? g.done + '/' + g.total : '0/0';
     document.getElementById('topbarStackCount').textContent =
       s.total ? s.done + '/' + s.total : '0/0';
-    document.getElementById('topbarWaterCount').textContent =
-      w.total ? w.done + '/' + w.total : '0/0';
+    document.getElementById('topbarWaterNum').textContent = w.total ? String(w.done) : '0';
+    document.getElementById('topbarWaterDen').textContent = w.total ? '/' + w.total : '/0';
 
     setPillStatus(goalsEl, classifyStatus(g.done, g.total));
     setPillStatus(stackEl, classifyStatus(s.done, s.total));
