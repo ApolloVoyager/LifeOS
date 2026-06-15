@@ -37,17 +37,17 @@
   -webkit-tap-highlight-color: transparent;
 }
 .topbar-water-pill .topbar-pill-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #7DD3FC; flex-shrink: 0;
+  width: 9px; height: 12px; flex-shrink: 0;
+  fill: #7DD3FC;
 }
-.topbar-water-pill.warn .topbar-pill-dot { background: #fbbf24; }
+.topbar-water-pill.warn .topbar-pill-dot { fill: #fbbf24; }
 .topbar-water-pill.miss .topbar-pill-dot {
-  background: #ff8a8a;
+  fill: #ff8a8a;
   animation: topbar-miss-pulse 1.6s ease-in-out infinite;
 }
 @keyframes topbar-miss-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-  50%      { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+  0%, 100% { filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0)); }
+  50%      { filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.7)); }
 }
 .topbar-pill-count {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -152,7 +152,7 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
 <header class="topbar" id="topbar" role="navigation" aria-label="Quick actions">
   <div class="topbar-water-wrap">
     <a href="health.html#water" class="topbar-water-pill" id="topbarWater" aria-label="Water progress">
-      <span class="topbar-pill-dot"></span>
+      <svg class="topbar-pill-dot" width="9" height="12" viewBox="0 0 9 12" xmlns="http://www.w3.org/2000/svg"><path d="M4.5 0C4.5 0 0 5.2 0 7.8C0 10.1 2.02 12 4.5 12C6.98 12 9 10.1 9 7.8C9 5.2 4.5 0 4.5 0Z"/></svg>
       <span class="topbar-pill-count" id="topbarWaterCount">0/0</span>
     </a>
     <button class="topbar-water-add" id="topbarWaterAdd" aria-label="Log one drink" type="button">+</button>
