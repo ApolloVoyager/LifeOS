@@ -10,9 +10,11 @@
 (function () {
   'use strict';
 
-  // -------- Supabase config (replace with your own project URL + publishable key) --------
-  const TOPBAR_SUPABASE_URL = 'https://zwpfcdtplemvrmegkvco.supabase.co';
-  const TOPBAR_SUPABASE_KEY = 'sb_publishable_r2ner9o8MWgFZbjmgd_oDg_-Qo9h0_q';
+  // -------- Supabase: use the shared authenticated client from auth.js --------
+  // window.LifeOS.supa carries the logged-in user's JWT so all water reads/
+  // writes are scoped to their own row via Row Level Security.
+  let tbUid = null;
+  function tbSupa() { return (window.LifeOS && window.LifeOS.supa) || null; }
 
   // -------- CSS --------
   const css = `
@@ -160,6 +162,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="finance.html" class="topbar-finance-btn" id="topbarFinance" aria-label="Finance">
     <span class="topbar-finance-icon">📊</span>
   </a>
+  <button class="topbar-finance-btn" id="topbarSignOut" aria-label="Sign out" type="button">
+    <span class="topbar-finance-icon">⎋</span>
+  </button>
 </header>`;
 
   const bottombarHtml = `
@@ -285,17 +290,16 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   async function pushWaterMergedToSupabase(localWater) {
     if (window.location.pathname.endsWith('/health.html') ||
         window.location.pathname.endsWith('health.html')) return;
-    if (!window.supabase || !TOPBAR_SUPABASE_URL || !TOPBAR_SUPABASE_KEY) return;
-    if (TOPBAR_SUPABASE_URL.indexOf('PASTE-') === 0) return;
+    const supa = tbSupa();
+    if (!supa || !tbUid) return;
     try {
-      const supa = window.supabase.createClient(TOPBAR_SUPABASE_URL, TOPBAR_SUPABASE_KEY);
       const { data } = await supa
-        .from('app_state').select('data').eq('key', 'health').maybeSingle();
+        .from('app_state').select('data').eq('user_id', tbUid).eq('key', 'health').maybeSingle();
       const current = (data && data.data) || {};
       const merged = Object.assign({}, current, { po_water_v1: localWater });
       await supa.from('app_state').upsert(
-        { key: 'health', data: merged, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
+        { user_id: tbUid, key: 'health', data: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,key' }
       );
     } catch (e) {}
   }
@@ -346,9 +350,10 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   // bottles logged on another device appear instantly on any page, not just
   // health.html. Only writes po_water_v1 — never touches other health keys.
   (async function initWaterSync() {
-    if (!window.supabase || !TOPBAR_SUPABASE_URL || !TOPBAR_SUPABASE_KEY) return;
-    if (TOPBAR_SUPABASE_URL.indexOf('PASTE-') === 0) return;
-    const supa = window.supabase.createClient(TOPBAR_SUPABASE_URL, TOPBAR_SUPABASE_KEY);
+    if (!window.LifeOS || !window.LifeOS.supa) return;
+    const user = await window.LifeOS.ready;   // waits until authed + approved
+    tbUid = user.id;
+    const supa = window.LifeOS.supa;
     function applyRemoteWater(data) {
       if (!data || !data.po_water_v1) return;
       const incoming = JSON.stringify(data.po_water_v1);
@@ -357,13 +362,14 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     }
     try {
       const { data, error } = await supa
-        .from('app_state').select('data').eq('key', 'health').maybeSingle();
+        .from('app_state').select('data').eq('user_id', tbUid).eq('key', 'health').maybeSingle();
       if (!error && data) applyRemoteWater(data.data);
     } catch (e) {}
     supa.channel('topbar_water_sync')
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.health',
       }, (payload) => {
+        if (payload.new && payload.new.user_id && payload.new.user_id !== tbUid) return;
         if (payload.new && payload.new.data) applyRemoteWater(payload.new.data);
       })
       .subscribe();
@@ -373,6 +379,11 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     injectStyleAndHTML();
     const btn = document.getElementById('topbarWaterAdd');
     if (btn) btn.addEventListener('click', (e) => { e.preventDefault(); addWater(); });
+    const signOutBtn = document.getElementById('topbarSignOut');
+    if (signOutBtn) signOutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (window.LifeOS && window.LifeOS.signOut) window.LifeOS.signOut();
+    });
     render();
     lockGestures();
     startModalLock();

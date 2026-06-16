@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0b" />
+  <title>LifeOS — Sign in</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: #0a0a0b; color: #FAFAFA;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+      -webkit-text-size-adjust: 100%;
+    }
+    .card {
+      width: 100%; max-width: 380px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 30px 26px 26px;
+    }
+    .brand {
+      text-align: center; margin-bottom: 22px;
+    }
+    .brand-dot {
+      display: inline-flex; width: 38px; height: 38px; border-radius: 11px;
+      background: linear-gradient(180deg, rgba(125, 211, 252, 0.9), rgba(110, 231, 183, 0.9));
+      align-items: center; justify-content: center; font-size: 20px; margin-bottom: 10px;
+    }
+    .brand h1 { font-size: 19px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+    .brand p { margin: 4px 0 0; font-size: 13px; color: rgba(255, 255, 255, 0.45); }
+    .tabs {
+      display: flex; gap: 4px; padding: 4px; margin-bottom: 18px;
+      background: rgba(255, 255, 255, 0.04); border-radius: 12px;
+    }
+    .tab {
+      flex: 1; padding: 9px 0; border: none; background: transparent; cursor: pointer;
+      color: rgba(255, 255, 255, 0.5); font: inherit; font-size: 14px; font-weight: 600;
+      border-radius: 9px; transition: background 0.15s, color 0.15s;
+    }
+    .tab.active { background: rgba(255, 255, 255, 0.10); color: #FAFAFA; }
+    label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); margin: 0 0 6px 2px; }
+    input {
+      width: 100%; padding: 12px 14px; margin-bottom: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 11px; color: #FAFAFA; font: inherit; font-size: 15px;
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus { border-color: rgba(125, 211, 252, 0.5); }
+    .btn {
+      width: 100%; padding: 13px 0; border: none; border-radius: 12px; cursor: pointer;
+      font: inherit; font-size: 15px; font-weight: 700; color: #06121a;
+      background: linear-gradient(180deg, #7DD3FC, #6EE7B7);
+      transition: transform 0.1s, opacity 0.15s; margin-top: 4px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn[disabled] { opacity: 0.55; cursor: default; }
+    .msg { margin-top: 14px; font-size: 13px; text-align: center; min-height: 18px; line-height: 1.5; }
+    .msg.err { color: #ff8a8a; }
+    .msg.ok { color: #6EE7B7; }
+    .pending {
+      text-align: center;
+    }
+    .pending .icon { font-size: 34px; margin-bottom: 8px; }
+    .pending h2 { font-size: 17px; margin: 0 0 8px; }
+    .pending p { font-size: 13.5px; color: rgba(255,255,255,0.55); line-height: 1.6; margin: 0 0 18px; }
+    .linkbtn {
+      background: none; border: none; color: rgba(255,255,255,0.5); font: inherit;
+      font-size: 13px; cursor: pointer; text-decoration: underline; padding: 6px;
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-dot">🗂️</div>
+      <h1>LifeOS</h1>
+      <p id="brandSub">Sign in to continue</p>
+    </div>
+
+    <!-- Auth form (login / signup) -->
+    <div id="authView">
+      <div class="tabs">
+        <button class="tab active" id="tabLogin" type="button">Log in</button>
+        <button class="tab" id="tabSignup" type="button">Sign up</button>
+      </div>
+      <form id="authForm" autocomplete="on">
+        <label for="email">Email</label>
+        <input id="email" type="email" inputmode="email" autocomplete="email" required />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required minlength="6" />
+        <button class="btn" id="submitBtn" type="submit">Log in</button>
+      </form>
+      <div class="msg" id="msg"></div>
+    </div>
+
+    <!-- Pending approval -->
+    <div id="pendingView" class="pending hidden">
+      <div class="icon">⏳</div>
+      <h2>Account pending approval</h2>
+      <p>Your account was created. It needs to be approved before you can access LifeOS.
+         Check back later.</p>
+      <button class="linkbtn" id="pendingSignOut" type="button">Sign out</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var supa = window.LifeOS && window.LifeOS.supa;
+      var params = new URLSearchParams(window.location.search);
+      var nextUrl = params.get('next') || 'index.html';
+
+      var authView = document.getElementById('authView');
+      var pendingView = document.getElementById('pendingView');
+      var tabLogin = document.getElementById('tabLogin');
+      var tabSignup = document.getElementById('tabSignup');
+      var form = document.getElementById('authForm');
+      var emailEl = document.getElementById('email');
+      var passEl = document.getElementById('password');
+      var submitBtn = document.getElementById('submitBtn');
+      var msg = document.getElementById('msg');
+      var brandSub = document.getElementById('brandSub');
+      var mode = 'login'; // 'login' | 'signup'
+
+      function setMsg(text, kind) {
+        msg.textContent = text || '';
+        msg.className = 'msg' + (kind ? ' ' + kind : '');
+      }
+      function showPending() {
+        authView.classList.add('hidden');
+        pendingView.classList.remove('hidden');
+        brandSub.textContent = 'Almost there';
+      }
+      function showAuth() {
+        pendingView.classList.add('hidden');
+        authView.classList.remove('hidden');
+      }
+      function setMode(m) {
+        mode = m;
+        var login = m === 'login';
+        tabLogin.classList.toggle('active', login);
+        tabSignup.classList.toggle('active', !login);
+        submitBtn.textContent = login ? 'Log in' : 'Create account';
+        passEl.setAttribute('autocomplete', login ? 'current-password' : 'new-password');
+        brandSub.textContent = login ? 'Sign in to continue' : 'Request an account';
+        setMsg('');
+      }
+      tabLogin.addEventListener('click', function () { setMode('login'); });
+      tabSignup.addEventListener('click', function () { setMode('signup'); });
+
+      async function checkApprovedAndGo(userId) {
+        try {
+          var res = await supa.from('profiles').select('approved').eq('id', userId).maybeSingle();
+          if (res.data && res.data.approved) {
+            window.location.replace(nextUrl);
+          } else {
+            showPending();
+          }
+        } catch (e) { showPending(); }
+      }
+
+      document.getElementById('pendingSignOut').addEventListener('click', async function () {
+        try { await supa.auth.signOut(); } catch (e) {}
+        showAuth();
+        setMode('login');
+      });
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (!supa) { setMsg('Connection unavailable. Try again.', 'err'); return; }
+        var email = emailEl.value.trim();
+        var password = passEl.value;
+        if (!email || !password) return;
+        submitBtn.disabled = true;
+        setMsg(mode === 'login' ? 'Signing in…' : 'Creating account…');
+        try {
+          if (mode === 'login') {
+            var r = await supa.auth.signInWithPassword({ email: email, password: password });
+            if (r.error) { setMsg(r.error.message, 'err'); submitBtn.disabled = false; return; }
+            await checkApprovedAndGo(r.data.user.id);
+          } else {
+            var s = await supa.auth.signUp({ email: email, password: password });
+            if (s.error) { setMsg(s.error.message, 'err'); submitBtn.disabled = false; return; }
+            // Email confirmation is off, so a session is returned immediately.
+            showPending();
+          }
+        } catch (err) {
+          setMsg('Something went wrong. Try again.', 'err');
+          submitBtn.disabled = false;
+        }
+      });
+
+      // On load: if already signed in, route accordingly. Honor ?pending=1.
+      (async function init() {
+        if (params.get('pending') === '1') {
+          // arrived here because signed in but not approved
+          showPending();
+          return;
+        }
+        if (!supa) return;
+        try {
+          var d = await supa.auth.getSession();
+          if (d.data && d.data.session) {
+            await checkApprovedAndGo(d.data.session.user.id);
+          }
+        } catch (e) {}
+      })();
+    })();
+  </script>
+</body>
+</html>

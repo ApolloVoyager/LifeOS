@@ -1,23 +1,26 @@
 // =============================================================
 // Shared cloud-sync helper. Each page calls initCloudSync({...}).
-// Replace the two placeholders with your Supabase project URL +
-// publishable key (same ones you used in topbar.js/gym.html).
+// Uses the shared authenticated client created by auth.js
+// (window.LifeOS.supa) so every read/write carries the logged-in
+// user's JWT and is scoped to their rows via Row Level Security.
+// Load order on each page:
+//   supabase-js CDN -> auth.js -> sync.js
 // =============================================================
 (function () {
   'use strict';
-  const SUPABASE_URL = 'https://zwpfcdtplemvrmegkvco.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_r2ner9o8MWgFZbjmgd_oDg_-Qo9h0_q';
 
   window.initCloudSync = function (config) {
     const appKey = config && config.appKey;
     const syncedKeys = (config && config.syncedKeys) || [];
     const syncedPrefixes = (config && config.syncedPrefixes) || [];
     const onApplied = config && config.onApplied;
-    if (!appKey || !window.supabase) return;
-    if (!SUPABASE_URL || !SUPABASE_KEY) return;
-    if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
+    if (!appKey || !window.LifeOS || !window.LifeOS.supa) return;
 
-    let supa = null, pushTimer = null, suppressSync = false, lastSyncedJson = null;
+    const supa = window.LifeOS.supa;
+    const SUPABASE_URL = window.LifeOS.SUPABASE_URL;
+    const SUPABASE_KEY = window.LifeOS.SUPABASE_KEY;
+
+    let uid = null, pushTimer = null, suppressSync = false, lastSyncedJson = null;
 
     function matches(k) {
       if (!k) return false;
@@ -73,42 +76,47 @@
       return changed;
     }
     async function pushNow() {
-      if (!supa) return;
+      if (!uid) return;
       const state = collect();
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       try {
         const { error } = await supa.from('app_state').upsert(
-          { key: appKey, data: state, updated_at: new Date().toISOString() },
-          { onConflict: 'key' }
+          { user_id: uid, key: appKey, data: state, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,key' }
         );
         if (!error) lastSyncedJson = json;
       } catch (e) {}
     }
     function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
     function flushOnUnload() {
+      if (!uid) return;
       const state = collect();
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
+      // Best-effort beacon using the current access token so RLS allows it.
+      const token = (window.LifeOS.session && window.LifeOS.session.access_token) || SUPABASE_KEY;
       try {
-        fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
+        fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=user_id,key', {
           method: 'POST',
           headers: {
             'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json',
             'Prefer': 'resolution=merge-duplicates',
           },
-          body: JSON.stringify({ key: appKey, data: state, updated_at: new Date().toISOString() }),
+          body: JSON.stringify({ user_id: uid, key: appKey, data: state, updated_at: new Date().toISOString() }),
           keepalive: true,
         }).catch(() => {});
         lastSyncedJson = json;
       } catch (e) {}
     }
     (async function init() {
-      supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const user = await window.LifeOS.ready;   // waits until authed + approved
+      uid = user.id;
       try {
-        const { data, error } = await supa.from('app_state').select('data').eq('key', appKey).maybeSingle();
+        const { data, error } = await supa
+          .from('app_state').select('data').eq('user_id', uid).eq('key', appKey).maybeSingle();
         if (!error && data && data.data && Object.keys(data.data).length > 0) {
           lastSyncedJson = JSON.stringify(data.data);
           applyRemote(data.data);
@@ -121,6 +129,7 @@
           event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.' + appKey,
         }, (payload) => {
           if (!payload.new || !payload.new.data) return;
+          if (payload.new.user_id && payload.new.user_id !== uid) return;
           const incoming = JSON.stringify(payload.new.data);
           if (incoming === lastSyncedJson) return;
           lastSyncedJson = incoming;

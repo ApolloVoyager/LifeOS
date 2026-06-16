@@ -1264,6 +1264,7 @@ img, video, canvas, svg { max-width: 100%; }
 .hidden { display: none !important; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 </head>
 <body>
 
@@ -2994,7 +2995,8 @@ img, video, canvas, svg { max-width: 100%; }
     try {
       const res = await fetch(dataUrl);
       const blob = await res.blob();
-      const filename = 'photo_' + Date.now() + '_' +
+      const uidPrefix = (pcUid || (window.LifeOS && window.LifeOS.user && window.LifeOS.user.id) || 'anon') + '/';
+      const filename = uidPrefix + 'photo_' + Date.now() + '_' +
         Math.random().toString(36).slice(2, 10) + '.jpg';
       const { error } = await pcSupa.storage
         .from('progress-photos')
@@ -3302,12 +3304,15 @@ img, video, canvas, svg { max-width: 100%; }
   // If you leave the placeholders unchanged the app still works,
   // just only on this device (data stays in your browser).
   // ============================================================
-  const SUPABASE_URL = 'https://zwpfcdtplemvrmegkvco.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_r2ner9o8MWgFZbjmgd_oDg_-Qo9h0_q';
+  // Uses the shared authenticated client from auth.js (window.LifeOS.supa)
+  // so all reads/writes are scoped to the logged-in user via RLS.
+  const SUPABASE_URL = (window.LifeOS && window.LifeOS.SUPABASE_URL) || '';
+  const SUPABASE_KEY = (window.LifeOS && window.LifeOS.SUPABASE_KEY) || '';
   const APP_KEY = 'po-coach';
   const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos'];
 
   let pcSupa = null;
+  let pcUid = null;
   let pcPushTimer = null;
   let pcSuppressSync = false;
   let pcPendingRemote = null;
@@ -3422,7 +3427,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   async function pcPushNow() {
-    if (!pcSupa) return;
+    if (!pcSupa || !pcUid) return;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
@@ -3430,8 +3435,8 @@ img, video, canvas, svg { max-width: 100%; }
       const { error } = await pcSupa
         .from('app_state')
         .upsert(
-          { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
-          { onConflict: 'key' }
+          { user_id: pcUid, key: APP_KEY, data: state, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,key' }
         );
       if (!error) pcLastSyncedJson = json;
     } catch (_) {}
@@ -3446,20 +3451,21 @@ img, video, canvas, svg { max-width: 100%; }
   // Backup push on unload via fetch keepalive so a fast refresh
   // doesn't lose the latest change before the debounced push fires.
   function pcFlushPushOnUnload() {
-    if (!pcSupa) return;
+    if (!pcSupa || !pcUid) return;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
+    const token = (window.LifeOS.session && window.LifeOS.session.access_token) || SUPABASE_KEY;
     try {
-      fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
+      fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=user_id,key', {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json',
           'Prefer': 'resolution=merge-duplicates',
         },
-        body: JSON.stringify({ key: APP_KEY, data: state, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ user_id: pcUid, key: APP_KEY, data: state, updated_at: new Date().toISOString() }),
         keepalive: true,
       }).catch(() => {});
       pcLastSyncedJson = json;
@@ -3469,13 +3475,13 @@ img, video, canvas, svg { max-width: 100%; }
   // Initial sync: connect Supabase, pull current state, subscribe to
   // realtime updates so other devices' changes appear instantly.
   (async function pcInitCloudSync() {
-    if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return;
-    // Skip if the placeholder values are still in place (local-only mode)
-    if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
-    pcSupa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    if (!window.LifeOS || !window.LifeOS.supa) return;
+    const user = await window.LifeOS.ready;   // waits until authed + approved
+    pcUid = user.id;
+    pcSupa = window.LifeOS.supa;
     try {
       const { data, error } = await pcSupa
-        .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
+        .from('app_state').select('data').eq('user_id', pcUid).eq('key', APP_KEY).maybeSingle();
       if (!error && data && data.data && Object.keys(data.data).length > 0) {
         pcLastSyncedJson = JSON.stringify(data.data);
         pcMaybeApplyRemote(data.data);
@@ -3491,6 +3497,7 @@ img, video, canvas, svg { max-width: 100%; }
         filter: 'key=eq.' + APP_KEY,
       }, (payload) => {
         if (!payload.new || !payload.new.data) return;
+        if (payload.new.user_id && payload.new.user_id !== pcUid) return;
         const incoming = JSON.stringify(payload.new.data);
         if (incoming === pcLastSyncedJson) return; // echo of our own push
         pcLastSyncedJson = incoming;

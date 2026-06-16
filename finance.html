@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Finances</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
 <style>
@@ -1578,6 +1579,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
   <span>Back</span>
 </a>
+<button class="fin-back-btn" id="finSignOut" type="button" aria-label="Sign out" style="float:right;">
+  <span>Sign out</span>
+</button>
+<script>
+  document.getElementById('finSignOut').addEventListener('click', function () {
+    if (window.LifeOS && window.LifeOS.signOut) window.LifeOS.signOut();
+  });
+</script>
 
 <!-- ===== FINANCE TICKER (rotating subscription renewals) ===== -->
 <div class="finance-ticker hidden" id="financeTicker">
