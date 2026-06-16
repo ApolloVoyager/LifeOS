@@ -320,6 +320,189 @@ body::after {
 }
 .gm-card-tomorrow .gm-progress-row { display: none; }
 
+/* ---------- Browse any day ---------- */
+.browse-wrap { margin-bottom: 14px; }
+.browse-trigger {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  color: var(--text-primary);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  transition: background 0.2s, border-color 0.2s;
+}
+.browse-trigger:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); }
+.browse-trigger-icon { font-size: 16px; line-height: 1; }
+.browse-trigger-label { flex: 1 1 auto; text-align: left; }
+.browse-trigger-chev { color: var(--text-tertiary); font-size: 12px; transition: transform 0.25s ease; }
+.browse-trigger.is-open .browse-trigger-chev { transform: rotate(180deg); }
+
+.gm-nav-btn {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 20px; line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.gm-nav-btn:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+
+.gm-cal {
+  margin: 4px 0 14px;
+  scroll-margin-bottom: 88px; /* clear the fixed bottom nav when auto-scrolled into view */
+  padding: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
+.gm-cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.gm-cal-nav {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.gm-cal-nav:hover { background: rgba(255,255,255,0.10); color: var(--text-primary); }
+.gm-cal-title {
+  font-size: 13px; font-weight: 700; color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.gm-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.gm-cal-dow {
+  text-align: center;
+  font-size: 10px; font-weight: 700;
+  color: var(--text-tertiary);
+  padding-bottom: 4px;
+}
+.gm-cal-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gm-cal-cell:hover { background: rgba(255,255,255,0.08); }
+.gm-cal-empty { background: transparent; border: 0; cursor: default; }
+.gm-cal-empty:hover { background: transparent; }
+.gm-cal-today { border-color: rgba(255,255,255,0.30); }
+.gm-cal-selected {
+  background: rgba(107,227,164,0.16);
+  border-color: var(--success);
+  color: var(--text-primary);
+}
+.gm-cal-dot {
+  position: absolute;
+  bottom: 4px; left: 50%; transform: translateX(-50%);
+  width: 5px; height: 5px; border-radius: 50%;
+}
+.gm-cal-dot-done { background: var(--success); }
+.gm-cal-dot-miss { background: var(--danger); }
+
+/* Read-only / moved rows in the browse view */
+.gm-row-ro { cursor: default; }
+.gm-row-moved {
+  opacity: 0.5;
+  font-style: italic;
+}
+.gm-row-moved .gm-text { text-decoration: line-through; color: var(--text-tertiary); }
+.gm-moved-note {
+  margin-left: auto;
+  font-size: 11px; font-style: normal;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* ---------- Day modal ---------- */
+body.modal-open { overflow: hidden; }
+.day-modal { position: fixed; inset: 0; z-index: 1000; }
+.day-modal[hidden] { display: none; }
+.day-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(5, 5, 6, 0.55);
+  backdrop-filter: blur(3px) saturate(1.05);
+  -webkit-backdrop-filter: blur(3px) saturate(1.05);
+  animation: dm-fade 0.2s ease-out;
+}
+.day-modal-window {
+  position: absolute;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(82vh, 760px);
+  display: flex; flex-direction: column;
+  background: #121214;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  overflow: hidden;
+  animation: dm-pop 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes dm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dm-pop { from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.day-modal-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.day-modal-titlewrap { flex: 1 1 auto; min-width: 0; text-align: center; }
+.day-modal-title {
+  font-size: 16px; font-weight: 700; color: var(--text-primary);
+  letter-spacing: 0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.day-modal-sub {
+  font-size: 11px; font-weight: 600; margin-top: 2px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+.day-modal-close {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none;
+  color: var(--text-tertiary);
+  font-size: 26px; line-height: 1; cursor: pointer;
+  transition: color 0.2s;
+}
+.day-modal-close:hover { color: var(--text-primary); }
+.day-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 12px 18px;
+}
+.day-modal-foot {
+  flex-shrink: 0;
+  padding: 12px 18px 16px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.day-modal-foot .gm-input-wrap { margin-top: 0; }
+
 .gm-streak {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 12px;
@@ -744,8 +927,44 @@ body::after {
         <div class="gm-status" id="tomorrowStatus"></div>
       </div>
     </div>
+
+    <!-- BROWSE ANY DAY -->
+    <div class="browse-wrap" id="browseWrap">
+      <button type="button" id="browseTrigger" class="browse-trigger" aria-expanded="false">
+        <span class="browse-trigger-icon">📅</span>
+        <span class="browse-trigger-label">Browse a day</span>
+        <span class="browse-trigger-chev" id="browseChev">▾</span>
+      </button>
+      <div id="browseCal" class="gm-cal" hidden></div>
+    </div>
   </div>
 
+</div>
+
+<!-- DAY MODAL -->
+<div id="dayModal" class="day-modal" hidden>
+  <div class="day-modal-backdrop" id="dayModalBackdrop"></div>
+  <div class="day-modal-window" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
+    <div class="day-modal-head">
+      <button type="button" id="dayModalPrev" class="gm-nav-btn" aria-label="Previous day">‹</button>
+      <div class="day-modal-titlewrap">
+        <div class="day-modal-title" id="dayModalTitle">Date</div>
+        <div class="day-modal-sub" id="dayModalSub"></div>
+      </div>
+      <button type="button" id="dayModalNext" class="gm-nav-btn" aria-label="Next day">›</button>
+      <button type="button" id="dayModalClose" class="day-modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="day-modal-body" id="dayModalBody">
+      <ul id="dayModalList" class="goal-list gm-list"></ul>
+      <div id="dayModalEmpty" class="empty-state">Nothing for this day</div>
+    </div>
+    <div class="day-modal-foot">
+      <div class="goal-input-wrap gm-input-wrap">
+        <input id="dayModalInput" class="gm-input" type="text" placeholder="Add a task for this day…" autocomplete="off">
+        <button type="button" id="dayModalAddBtn" class="gm-add">+ Add</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -824,14 +1043,20 @@ body::after {
       const dateStr = k.slice('goals:'.length);
       if (dateStr >= todayDateStr) return;
       const old = getGoals(k);
+      let oldChanged = false;
       old.forEach(g => {
-        if (g.habitId) return;
-        if (!g.done && g.text && !texts.has(g.text)) {
+        // skip habits, finished tasks, already-rolled tasks, and empties
+        if (g.habitId || g.done || g.rolledTo || !g.text) return;
+        if (!texts.has(g.text)) {
           today.push({ text: g.text, done: false });
           texts.add(g.text);
         }
+        // leave the task in its original day as a "→ moved" breadcrumb so the
+        // day stays viewable and it isn't pulled forward again tomorrow
+        g.rolledTo = todayDateStr;
+        oldChanged = true;
       });
-      storeDelete(k);
+      if (oldChanged) setGoals(k, old); // retain the past day (no storeDelete)
     });
     setGoals(todayK, today);
   }
@@ -926,6 +1151,7 @@ body::after {
   window.addEventListener('goals-changed', () => {
     cycleIdx = 0;
     tick();
+    renderModal();
   });
 
   // ---------- Day Ring ----------
@@ -1138,12 +1364,43 @@ body::after {
     handle.addEventListener('touchcancel', end);
   }
 
-  function buildGoalRow(goal, idx, key, readOnly, reload) {
+  function buildGoalRow(goal, idx, key, readOnly, reload, locked) {
     const li = document.createElement('li');
     li.className = 'gm-row';
     li.dataset.idx = String(idx);
+
+    // A task that rolled forward stays in its original day as a greyed,
+    // non-interactive breadcrumb (only seen in the read-only browse view).
+    if (goal.rolledTo) {
+      li.classList.add('gm-row-moved');
+      const movedText = document.createElement('span');
+      movedText.className = 'gm-text';
+      movedText.textContent = goal.text;
+      li.appendChild(movedText);
+      const note = document.createElement('span');
+      note.className = 'gm-moved-note';
+      note.textContent = '→ moved to ' + formatDate(goal.rolledTo);
+      li.appendChild(note);
+      return li;
+    }
+
     if (goal.done) li.classList.add('gm-row-done');
     if (goal.queued) li.classList.add('gm-row-queued');
+
+    // Fully-locked read-only display (browsing a past/current day): show the
+    // recorded state but allow no edits, reordering, queueing, or deletion.
+    if (locked) {
+      li.classList.add('gm-row-ro');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'gm-check';
+      cb.checked = !!goal.done; cb.disabled = true;
+      li.appendChild(cb);
+      const text = document.createElement('span');
+      text.className = 'gm-text';
+      text.textContent = goal.text;
+      li.appendChild(text);
+      return li;
+    }
 
     const handle = document.createElement('span');
     handle.className = 'gm-handle';
@@ -1249,13 +1506,14 @@ body::after {
       'Plan tomorrow — ' + formatDate(getTomorrowDateString());
   }
 
-  function renderListInto(goals, listEl, emptyEl, key, readOnly) {
+  function renderListInto(goals, listEl, emptyEl, key, readOnly, opts) {
+    opts = opts || {};
     listEl.innerHTML = '';
     emptyEl.style.display = goals.length === 0 ? 'block' : 'none';
-    const reload = () => (key === todayKey() ? loadToday() : loadTomorrow());
+    const reload = opts.reloadFn || (() => (key === todayKey() ? loadToday() : loadTomorrow()));
 
     const visible = goals.length > 5 ? goals.slice(0, 5) : goals;
-    visible.forEach((g, i) => listEl.appendChild(buildRow(g, i, key, readOnly, reload)));
+    visible.forEach((g, i) => listEl.appendChild(buildRow(g, i, key, readOnly, reload, opts)));
 
     if (goals.length > 5) {
       let expanded = false;
@@ -1270,7 +1528,7 @@ body::after {
         expanded = !expanded;
         if (expanded) {
           goals.slice(5).forEach((g, i) => {
-            const row = buildRow(g, i + 5, key, readOnly, reload);
+            const row = buildRow(g, i + 5, key, readOnly, reload, opts);
             listEl.insertBefore(row, toggle);
           });
         } else {
@@ -1281,6 +1539,8 @@ body::after {
       listEl.appendChild(toggle);
     }
 
+    // Browse (custom reload) must not touch the Today/Tomorrow headers.
+    if (opts.reloadFn) return;
     if (key === todayKey()) renderTodayHeader();
     else                    renderTomorrowCount();
   }
@@ -1294,6 +1554,174 @@ body::after {
     renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), true);
   }
 
+  // ---------- Browse any day ----------
+  let browseDate = null;   // 'YYYY-MM-DD' currently being viewed
+  let calMonth = null;     // Date at the 1st of the month shown in the calendar popup
+
+  function parseDateKey(s) {
+    const p = String(s).split('-');
+    return new Date(+p[0], (+p[1]) - 1, +p[2]);
+  }
+
+  // Calendar dot reflects HABIT completion only (tasks roll forward, so they
+  // never read as "missed"). Green = all scheduled habits done, red = partial/
+  // none. No dot for habit-free days or any future day.
+  function habitDotClass(dateStr) {
+    if (!window.Habits || dateStr > getActiveDateString()) return '';
+    const H = window.Habits;
+    const state = H.load();
+    const sched = H.scheduledHabitsOn(state, dateStr);
+    if (!sched.length) return '';
+    const done = sched.filter(h => H.isDoneOn(state, h, dateStr)).length;
+    return done === sched.length ? 'gm-cal-dot-done' : 'gm-cal-dot-miss';
+  }
+
+  // ----- Day modal: full to-do behaviour for any single day -----
+  let renderingModal = false;
+  function dayModalOpen() { return !document.getElementById('dayModal').hidden; }
+
+  function openDayModal(dateStr) {
+    browseDate = dateStr;
+    document.getElementById('dayModal').hidden = false;
+    document.body.classList.add('modal-open');
+    renderModal();
+  }
+  function closeDayModal() {
+    document.getElementById('dayModal').hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+  function shiftDay(n) {
+    const d = parseDateKey(browseDate);
+    d.setDate(d.getDate() + n);
+    browseDate = dateToKey(d);
+    renderModal();
+  }
+
+  function renderModal() {
+    if (!dayModalOpen() || !browseDate || renderingModal) return;
+    renderingModal = true; // guard against re-entry from setGoals/Habits.save events
+    try {
+      ensureHabitsFor(browseDate); // inject this day's scheduled habits into its list
+
+      const active = getActiveDateString();
+      const rel = browseDate < active ? 'Past' : (browseDate > active ? 'Upcoming' : 'Today');
+      document.getElementById('dayModalTitle').textContent = formatDate(browseDate);
+
+      const key = 'goals:' + browseDate;
+      const goals = getGoals(key);
+      const done = goals.filter(g => g.done).length;
+      document.getElementById('dayModalSub').textContent =
+        goals.length ? (rel + ' · ' + done + '/' + goals.length + ' done') : rel;
+
+      const listEl  = document.getElementById('dayModalList');
+      const emptyEl = document.getElementById('dayModalEmpty');
+      // Fully interactive — same builders as the Today list, bound to this date.
+      renderListInto(goals, listEl, emptyEl, key, false, { reloadFn: renderModal, dateStr: browseDate });
+
+      if (goals.length === 0) {
+        const hist = storeGet('history_start');
+        emptyEl.textContent = (browseDate < active && hist && browseDate < hist)
+          ? 'Tracking history began ' + formatDate(hist)
+          : 'Nothing for this day yet';
+      }
+
+      renderCalendar(); // keep the calendar's selected-day highlight in sync
+    } finally {
+      renderingModal = false;
+    }
+  }
+
+  function renderCalendar() {
+    const cal = document.getElementById('browseCal');
+    if (!cal || cal.hidden || !calMonth) return;
+    const active = getActiveDateString();
+    const year = calMonth.getFullYear(), month = calMonth.getMonth();
+    const title = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const firstDow = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+
+    let html = '<div class="gm-cal-head">'
+      + '<button type="button" class="gm-cal-nav" data-cal="prev" aria-label="Previous month">‹</button>'
+      + '<span class="gm-cal-title">' + title + '</span>'
+      + '<button type="button" class="gm-cal-nav" data-cal="next" aria-label="Next month">›</button>'
+      + '</div><div class="gm-cal-grid">';
+    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(w => html += '<span class="gm-cal-dow">' + w + '</span>');
+    for (let i = 0; i < firstDow; i++) html += '<span class="gm-cal-cell gm-cal-empty"></span>';
+    for (let d = 1; d <= days; d++) {
+      const ds = year + '-' + pad2(month + 1) + '-' + pad2(d);
+      const dot = habitDotClass(ds);
+      let cls = 'gm-cal-cell';
+      if (ds === browseDate) cls += ' gm-cal-selected';
+      if (ds === active)     cls += ' gm-cal-today';
+      html += '<button type="button" class="' + cls + '" data-date="' + ds + '">'
+        + '<span class="gm-cal-num">' + d + '</span>'
+        + (dot ? '<span class="gm-cal-dot ' + dot + '"></span>' : '')
+        + '</button>';
+    }
+    cal.innerHTML = html + '</div>';
+  }
+
+  function initBrowse() {
+    browseDate = getActiveDateString();
+    const trigger = document.getElementById('browseTrigger');
+    const cal = document.getElementById('browseCal');
+    if (!trigger) return;
+
+    const setCalOpen = (open) => {
+      cal.hidden = !open;
+      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      trigger.classList.toggle('is-open', open);
+      if (open) {
+        const d = parseDateKey(browseDate);
+        calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+        renderCalendar();
+        // Reveal the just-expanded calendar (it sits at the bottom of the page).
+        requestAnimationFrame(() => cal.scrollIntoView({ behavior: 'smooth', block: 'end' }));
+      }
+    };
+
+    // Trigger expands / collapses the calendar.
+    trigger.addEventListener('click', () => setCalOpen(cal.hidden));
+    document.addEventListener('click', (e) => {
+      if (cal.hidden || dayModalOpen()) return;   // modal interactions don't collapse it
+      if (e.target.closest('#browseWrap')) return; // clicks inside keep it open
+      setCalOpen(false);
+    });
+
+    // Calendar: month nav + day selection (opens the modal).
+    cal.addEventListener('click', (e) => {
+      const nav = e.target.closest('[data-cal]');
+      if (nav) {
+        calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + (nav.dataset.cal === 'next' ? 1 : -1), 1);
+        renderCalendar();
+        return;
+      }
+      const dayBtn = e.target.closest('[data-date]');
+      if (dayBtn) openDayModal(dayBtn.dataset.date);
+    });
+
+    // Day modal controls.
+    document.getElementById('dayModalPrev').addEventListener('click', () => shiftDay(-1));
+    document.getElementById('dayModalNext').addEventListener('click', () => shiftDay(1));
+    document.getElementById('dayModalClose').addEventListener('click', closeDayModal);
+    document.getElementById('dayModalBackdrop').addEventListener('click', closeDayModal);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dayModalOpen()) closeDayModal(); });
+
+    const input = document.getElementById('dayModalInput');
+    const addTask = () => {
+      const v = input.value.trim();
+      if (!v) return;
+      const key = 'goals:' + browseDate;
+      const list = getGoals(key);
+      list.push({ text: v, done: false });
+      setGoals(key, list);
+      input.value = '';
+      renderModal();
+    };
+    document.getElementById('dayModalAddBtn').addEventListener('click', addTask);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addTask(); } });
+  }
+
   // ---------- Habits (Phase A) ----------
   function habitHexA(hex, a) {
     const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
@@ -1302,10 +1730,10 @@ body::after {
   }
   const expandedHabits = new Set();
 
-  function setHabitCount(habitId, n) {
+  function setHabitCount(habitId, n, dateStr) {
     const state = window.Habits.load();
-    window.Habits.setCount(state, habitId, getActiveDateString(), n);
-    window.Habits.save(state); // -> 'habits-changed' -> ensureTodayHabits() + loadToday()
+    window.Habits.setCount(state, habitId, dateStr || getActiveDateString(), n);
+    window.Habits.save(state); // -> 'habits-changed' -> ensureTodayHabits()/renderModal() + loadToday()
   }
   function celebrateMilestone(habit, stage, color) {
     const H = window.Habits;
@@ -1407,15 +1835,16 @@ body::after {
     }
     return panel;
   }
-  function buildHabitRow2(goal, idx, key, reload) {
+  function buildHabitRow2(goal, idx, key, reload, dateStr, readOnly) {
     const H = window.Habits;
     const li = document.createElement('li');
     li.className = 'gm-row habit-row';
     li.dataset.idx = String(idx);
     const state = H.load();
-    const active = getActiveDateString();
+    const active = dateStr || getActiveDateString();
     const habit = H.habitById(state, goal.habitId);
     if (!habit) return li;
+    if (readOnly) li.classList.add('gm-row-ro');
 
     const color = H.categoryColor(state, habit.categoryId);
     li.style.boxShadow = 'inset 3px 0 0 0 ' + color;
@@ -1437,18 +1866,21 @@ body::after {
       ctr.className = 'habit-counter';
       const minus = document.createElement('button');
       minus.type = 'button'; minus.className = 'habit-step'; minus.textContent = '−';
-      minus.addEventListener('click', () => setHabitCount(habit.id, Math.max(0, count - 1)));
+      minus.disabled = !!readOnly;
+      minus.addEventListener('click', () => setHabitCount(habit.id, Math.max(0, count - 1), active));
       const val = document.createElement('span');
       val.className = 'habit-count-val'; val.textContent = count + '/' + req;
       const plus = document.createElement('button');
       plus.type = 'button'; plus.className = 'habit-step'; plus.textContent = '+';
-      plus.addEventListener('click', () => setHabitCount(habit.id, Math.min(req, count + 1)));
+      plus.disabled = !!readOnly;
+      plus.addEventListener('click', () => setHabitCount(habit.id, Math.min(req, count + 1), active));
       ctr.appendChild(minus); ctr.appendChild(val); ctr.appendChild(plus);
       top.appendChild(ctr);
     } else {
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.className = 'gm-check'; cb.checked = done;
-      cb.addEventListener('change', () => setHabitCount(habit.id, cb.checked ? req : 0));
+      cb.disabled = !!readOnly;
+      cb.addEventListener('change', () => setHabitCount(habit.id, cb.checked ? req : 0, active));
       top.appendChild(cb);
     }
 
@@ -1463,16 +1895,17 @@ body::after {
 
     if (isComplex) {
       const prog = H.milestoneProgress(state, habit);
-      const open = expandedHabits.has(habit.id);
+      const open = !readOnly && expandedHabits.has(habit.id);
       const mtoggle = document.createElement('button');
       mtoggle.type = 'button';
       mtoggle.className = 'ms-toggle';
-      mtoggle.textContent = (open ? '▾ ' : '▸ ') + prog.doneSteps + '/' + prog.totalSteps;
+      mtoggle.textContent = (readOnly ? '' : (open ? '▾ ' : '▸ ')) + prog.doneSteps + '/' + prog.totalSteps;
       mtoggle.title = 'Milestones';
-      mtoggle.addEventListener('click', () => {
+      mtoggle.disabled = !!readOnly;
+      if (!readOnly) mtoggle.addEventListener('click', () => {
         if (expandedHabits.has(habit.id)) expandedHabits.delete(habit.id);
         else expandedHabits.add(habit.id);
-        loadToday();
+        reload();
       });
       top.appendChild(mtoggle);
     }
@@ -1486,22 +1919,27 @@ body::after {
 
     if (isComplex) {
       li.appendChild(top);
-      if (expandedHabits.has(habit.id)) li.appendChild(buildMilestonePanel(habit, state));
+      if (!readOnly && expandedHabits.has(habit.id)) li.appendChild(buildMilestonePanel(habit, state));
     }
 
-    wireDragReorder(li, handle, key, reload);
+    if (readOnly) handle.style.display = 'none';
+    else wireDragReorder(li, handle, key, reload);
     return li;
   }
-  function buildRow(g, idx, key, readOnly, reload) {
-    return (g && g.habitId) ? buildHabitRow2(g, idx, key, reload) : buildGoalRow(g, idx, key, readOnly, reload);
+  function buildRow(g, idx, key, readOnly, reload, opts) {
+    opts = opts || {};
+    return (g && g.habitId)
+      ? buildHabitRow2(g, idx, key, reload, opts.dateStr, opts.habitReadOnly)
+      : buildGoalRow(g, idx, key, readOnly, reload, opts.locked);
   }
-  // Keep today's goal list in sync with scheduled habits (completion truth lives in the habit log).
-  function ensureTodayHabits() {
+  // Keep a day's goal list in sync with the habits scheduled on that day
+  // (completion truth lives in the habit log, keyed by date).
+  function ensureTodayHabits() { ensureHabitsFor(getActiveDateString()); }
+  function ensureHabitsFor(active) {
     if (!window.Habits) return;
     const H = window.Habits;
     const state = H.load();
-    const active = getActiveDateString();
-    const key = todayKey();
+    const key = 'goals:' + active;
     const scheduled = H.scheduledHabitsOn(state, active);
     const byId = {};
     scheduled.forEach(h => { byId[h.id] = h; });
@@ -1640,21 +2078,24 @@ body::after {
   );
 
   // ---------- Boot ----------
+  // Mark when history tracking began, so empty pre-launch days can say so.
+  if (!storeGet('history_start')) storeSet('history_start', getActiveDateString());
   rollover();
   processStreak();
   ensureTodayHabits();
   loadToday();
   loadTomorrow();
   renderStreak();
+  initBrowse();
   updateDayRing();
   setInterval(updateDayRing, 60 * 1000);
   startTicker();
 
   // Re-render when storage changes from another tab (or our bridged parent).
   window.addEventListener('storage', () => {
-    ensureTodayHabits(); loadToday(); loadTomorrow(); renderStreak();
+    ensureTodayHabits(); loadToday(); loadTomorrow(); renderStreak(); renderModal();
   });
-  window.addEventListener('habits-changed', () => { ensureTodayHabits(); loadToday(); });
+  window.addEventListener('habits-changed', () => { ensureTodayHabits(); loadToday(); renderModal(); });
 })();
 </script>
 <script>
