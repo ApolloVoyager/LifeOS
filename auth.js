@@ -59,19 +59,16 @@
       drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
     } catch (e) {}
   }
+  // Only purge when we POSITIVELY identify a different signed-in user.
+  // We never purge just because the token couldn't be read — that could
+  // wipe unsynced local edits. Genuine sign-out is handled by signOut()
+  // and the SIGNED_OUT auth event below.
   (function lifeosGuardLocalData() {
     const sessUid = lifeosReadSessionUserId();
     const lastUid = localStorage.getItem('lifeos_uid');
-    if (sessUid) {
-      // Purge unless the cache already belongs to this exact user.
-      if (sessUid !== lastUid) {
-        lifeosPurgeAppData();
-        try { localStorage.setItem('lifeos_uid', sessUid); } catch (e) {}
-      }
-    } else if (lastUid) {
-      // No active session but stale data is present -> wipe it.
+    if (sessUid && sessUid !== lastUid) {
       lifeosPurgeAppData();
-      try { localStorage.removeItem('lifeos_uid'); } catch (e) {}
+      try { localStorage.setItem('lifeos_uid', sessUid); } catch (e) {}
     }
   })();
 
@@ -168,6 +165,15 @@
     window.LifeOS.user = session.user;
 
     if (!(await isApproved())) { if (!embedded) redirectToLogin('pending=1'); return; }
+
+    // Authoritative backstop (real session, not the sync parse): if cached
+    // data belongs to a different user, purge it before sync reads it. If no
+    // tag exists yet, just adopt it without purging (preserve unsynced data).
+    try {
+      const stored = localStorage.getItem('lifeos_uid');
+      if (stored && stored !== window.LifeOS.user.id) lifeosPurgeAppData();
+      localStorage.setItem('lifeos_uid', window.LifeOS.user.id);
+    } catch (e) {}
 
     revealPage();
     resolveReady(window.LifeOS.user);
