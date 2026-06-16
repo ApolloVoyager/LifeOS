@@ -415,6 +415,12 @@ body::after {
 }
 .gm-row:hover .gm-handle { opacity: 1; }
 .gm-handle:active { cursor: grabbing; }
+/* Touch devices have no hover, so keep the handle visible and let it own the
+   touch gesture (prevents the page from scrolling while reordering). */
+@media (hover: none), (pointer: coarse) {
+  .gm-handle { opacity: 0.6; touch-action: none; }
+}
+.gm-row-dragging { opacity: 0.6; }
 
 .gm-check {
   appearance: none; -webkit-appearance: none;
@@ -1056,7 +1062,17 @@ body::after {
     });
   }
 
-  function wireDragReorder(row, listEl, key, reload) {
+  function reorderGoals(key, from, to, reload) {
+    if (isNaN(from) || isNaN(to) || from === to) return;
+    const list = getGoals(key);
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    setGoals(key, list);
+    reload();
+  }
+
+  function wireDragReorder(row, handle, key, reload) {
+    // Desktop: HTML5 drag-and-drop
     row.setAttribute('draggable', 'true');
     row.addEventListener('dragstart', (e) => {
       e.dataTransfer.effectAllowed = 'move';
@@ -1072,13 +1088,54 @@ body::after {
       row.classList.remove('is-drag-over');
       const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
       const to   = parseInt(row.dataset.idx, 10);
-      if (isNaN(from) || isNaN(to) || from === to) return;
-      const list = getGoals(key);
-      const [moved] = list.splice(from, 1);
-      list.splice(to, 0, moved);
-      setGoals(key, list);
-      reload();
+      reorderGoals(key, from, to, reload);
     });
+
+    // Mobile: touch-driven reorder from the drag handle.
+    // HTML5 DnD events never fire from touch input, so we replicate them here.
+    if (handle) wireTouchReorder(row, handle, key, reload);
+  }
+
+  function wireTouchReorder(row, handle, key, reload) {
+    let dragging = false;
+    let fromIdx = NaN;
+    let overRow = null;
+
+    const clearOver = () => {
+      if (overRow) { overRow.classList.remove('is-drag-over'); overRow = null; }
+    };
+
+    handle.addEventListener('touchstart', (e) => {
+      fromIdx = parseInt(row.dataset.idx, 10);
+      dragging = true;
+      row.classList.add('gm-row-dragging');
+      e.preventDefault(); // stop the page from scrolling while dragging
+    }, { passive: false });
+
+    handle.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const target = document.elementFromPoint(t.clientX, t.clientY);
+      const candidate = target && target.closest('.gm-row');
+      if (candidate === overRow) return;
+      clearOver();
+      if (candidate && candidate !== row && candidate.parentElement === row.parentElement) {
+        candidate.classList.add('is-drag-over');
+        overRow = candidate;
+      }
+    }, { passive: false });
+
+    const end = () => {
+      if (!dragging) return;
+      dragging = false;
+      row.classList.remove('gm-row-dragging');
+      const to = overRow ? parseInt(overRow.dataset.idx, 10) : NaN;
+      clearOver();
+      reorderGoals(key, fromIdx, to, reload);
+    };
+    handle.addEventListener('touchend', end);
+    handle.addEventListener('touchcancel', end);
   }
 
   function buildGoalRow(goal, idx, key, readOnly, reload) {
@@ -1144,7 +1201,7 @@ body::after {
     });
     li.appendChild(del);
 
-    wireDragReorder(li, null, key, reload);
+    wireDragReorder(li, handle, key, reload);
     return li;
   }
 
@@ -1432,7 +1489,7 @@ body::after {
       if (expandedHabits.has(habit.id)) li.appendChild(buildMilestonePanel(habit, state));
     }
 
-    wireDragReorder(li, null, key, reload);
+    wireDragReorder(li, handle, key, reload);
     return li;
   }
   function buildRow(g, idx, key, readOnly, reload) {
