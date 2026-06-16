@@ -4,7 +4,6 @@ This adds login to LifeOS. Each approved account gets its **own private** LifeOS
 All existing data is migrated to a single **master account** (you). New people can sign
 up, but they can't see anything until **you approve them** in the Supabase dashboard —
 no admin login lives inside the app.
-
 Everything below happens in your Supabase project dashboard + SQL Editor. All on the free tier.
 
 ## Order matters (so you don't lock yourself out)

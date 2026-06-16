@@ -21,6 +21,60 @@
   const SUPABASE_URL = 'https://zwpfcdtplemvrmegkvco.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_r2ner9o8MWgFZbjmgd_oDg_-Qo9h0_q';
 
+  // -----------------------------------------------------------------
+  // Multi-account safety. The app caches data in localStorage; on a
+  // SHARED browser one account must never see another's cached data.
+  // We tag localStorage with the user id it belongs to and wipe all
+  // app data the moment the signed-in user no longer matches it.
+  // This runs synchronously, before any page render or sync reads
+  // localStorage, and uses only localStorage (no Supabase needed).
+  // -----------------------------------------------------------------
+  function lifeosReadSessionUserId() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || k.indexOf('sb-') !== 0 || k.indexOf('-auth-token') === -1) continue;
+        let obj = null;
+        try { obj = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { continue; }
+        if (!obj) continue;
+        const id =
+          (obj.user && obj.user.id) ||
+          (obj.currentSession && obj.currentSession.user && obj.currentSession.user.id) ||
+          (obj.session && obj.session.user && obj.session.user.id);
+        if (id) return id;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function lifeosPurgeAppData() {
+    try {
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf('sb-') === 0) continue;   // keep Supabase auth session
+        if (k === 'lifeos_uid') continue;        // keep our ownership tag
+        drop.push(k);
+      }
+      drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+    } catch (e) {}
+  }
+  (function lifeosGuardLocalData() {
+    const sessUid = lifeosReadSessionUserId();
+    const lastUid = localStorage.getItem('lifeos_uid');
+    if (sessUid) {
+      // Purge unless the cache already belongs to this exact user.
+      if (sessUid !== lastUid) {
+        lifeosPurgeAppData();
+        try { localStorage.setItem('lifeos_uid', sessUid); } catch (e) {}
+      }
+    } else if (lastUid) {
+      // No active session but stale data is present -> wipe it.
+      lifeosPurgeAppData();
+      try { localStorage.removeItem('lifeos_uid'); } catch (e) {}
+    }
+  })();
+
   function isLoginPage() {
     const p = (window.location.pathname || '').toLowerCase();
     return p.endsWith('/login.html') || p.endsWith('login.html');
@@ -76,6 +130,8 @@
     },
     async signOut() {
       try { if (supa) await supa.auth.signOut(); } catch (e) {}
+      lifeosPurgeAppData();
+      try { localStorage.removeItem('lifeos_uid'); } catch (e) {}
       window.location.replace('login.html');
     },
   };

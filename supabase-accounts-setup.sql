@@ -71,7 +71,6 @@ create policy "app_state own rows" on public.app_state
   for all
   using (user_id = auth.uid() and public.is_approved())
   with check (user_id = auth.uid() and public.is_approved());
-
 alter table public.profiles enable row level security;
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles
