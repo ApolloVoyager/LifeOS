@@ -22,6 +22,10 @@
 
     let uid = null, pushTimer = null, suppressSync = false, lastSyncedJson = null;
 
+    // True while auth.js is tearing down the session (sign-out / account
+    // switch). Pushing during that window would upload an emptied state.
+    function syncSuspended() { return !!(window.LifeOS && window.LifeOS.syncSuspended); }
+
     function matches(k) {
       if (!k) return false;
       if (syncedKeys.indexOf(k) !== -1) return true;
@@ -76,8 +80,13 @@
       return changed;
     }
     async function pushNow() {
-      if (!uid) return;
+      if (!uid || syncSuspended()) return;
       const state = collect();
+      // Never overwrite the cloud with an empty snapshot. An empty collect()
+      // means our app data was purged (sign-out / account switch) or never
+      // loaded — uploading it would wipe this user's cloud copy. A real user
+      // with data always has at least one matching key.
+      if (Object.keys(state).length === 0) return;
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       try {
@@ -88,10 +97,11 @@
         if (!error) lastSyncedJson = json;
       } catch (e) {}
     }
-    function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
+    function schedulePush() { if (syncSuspended()) return; clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
     function flushOnUnload() {
-      if (!uid) return;
+      if (!uid || syncSuspended()) return;
       const state = collect();
+      if (Object.keys(state).length === 0) return;   // never beacon an empty wipe
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       // Best-effort beacon using the current access token so RLS allows it.

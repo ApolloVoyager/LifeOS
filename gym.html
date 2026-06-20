@@ -3319,6 +3319,9 @@ img, video, canvas, svg { max-width: 100%; }
   // JSON of the last state we sent or received — used to ignore
   // realtime echoes of our own pushes so we don't infinite-loop.
   let pcLastSyncedJson = null;
+  // True while auth.js is tearing down the session (sign-out / account
+  // switch). Pushing during that window would upload an emptied state.
+  function pcSyncSuspended() { return !!(window.LifeOS && window.LifeOS.syncSuspended); }
 
   const _pcOrigSet = localStorage.setItem.bind(localStorage);
   const _pcOrigRemove = localStorage.removeItem.bind(localStorage);
@@ -3427,8 +3430,11 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   async function pcPushNow() {
-    if (!pcSupa || !pcUid) return;
+    if (!pcSupa || !pcUid || pcSyncSuspended()) return;
     const state = pcCollectState();
+    // Never overwrite the cloud with an empty snapshot (purge / account
+    // switch / failed load) — it would wipe this user's saved gym data.
+    if (Object.keys(state).length === 0) return;
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
     try {
@@ -3443,7 +3449,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   function pcSchedulePush() {
-    if (pcSuppressSync) return;
+    if (pcSuppressSync || pcSyncSuspended()) return;
     clearTimeout(pcPushTimer);
     pcPushTimer = setTimeout(pcPushNow, 250);
   }
@@ -3451,8 +3457,9 @@ img, video, canvas, svg { max-width: 100%; }
   // Backup push on unload via fetch keepalive so a fast refresh
   // doesn't lose the latest change before the debounced push fires.
   function pcFlushPushOnUnload() {
-    if (!pcSupa || !pcUid) return;
+    if (!pcSupa || !pcUid || pcSyncSuspended()) return;
     const state = pcCollectState();
+    if (Object.keys(state).length === 0) return;   // never beacon an empty wipe
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
     const token = (window.LifeOS.session && window.LifeOS.session.access_token) || SUPABASE_KEY;

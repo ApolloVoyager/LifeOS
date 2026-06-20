@@ -118,6 +118,9 @@
     supa: supa,
     user: null,
     session: null,
+    // When true, sync.js / gym.html must not push to the cloud. Set during
+    // signOut() so tearing down the session can't upload an emptied state.
+    syncSuspended: false,
     ready: ready,           // resolves with the user once authed + approved
     async accessToken() {
       try {
@@ -126,6 +129,13 @@
       } catch (e) { return null; }
     },
     async signOut() {
+      // Suspend cloud sync FIRST. Signing out + purging below empties the
+      // app data in localStorage, and the navigation that follows fires the
+      // unload flush. Without this flag those paths would push an empty
+      // snapshot to the OUTGOING user's cloud row (their access token is
+      // still in memory) and wipe it. Read by sync.js / gym.html before
+      // every push. Naturally resets on the next page load.
+      window.LifeOS.syncSuspended = true;
       try { if (supa) await supa.auth.signOut(); } catch (e) {}
       lifeosPurgeAppData();
       try { localStorage.removeItem('lifeos_uid'); } catch (e) {}
