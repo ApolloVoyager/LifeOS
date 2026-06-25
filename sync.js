@@ -121,19 +121,23 @@
         lastSyncedJson = json;
       } catch (e) {}
     }
-    (async function init() {
-      const user = await window.LifeOS.ready;   // waits until authed + approved
-      uid = user.id;
+    async function pullNow() {
+      if (!uid) return;
       try {
         const { data, error } = await supa
           .from('app_state').select('data').eq('user_id', uid).eq('key', appKey).maybeSingle();
         if (!error && data && data.data && Object.keys(data.data).length > 0) {
-          lastSyncedJson = JSON.stringify(data.data);
-          applyRemote(data.data);
-        } else if (Object.keys(collect()).length > 0) {
-          schedulePush();
+          const incoming = JSON.stringify(data.data);
+          if (incoming !== lastSyncedJson) { lastSyncedJson = incoming; applyRemote(data.data); }
         }
       } catch (e) {}
+    }
+    (async function init() {
+      const user = await window.LifeOS.ready;   // waits until authed + approved
+      uid = user.id;
+      await pullNow();
+      // Cloud had nothing yet but we have local data -> seed it up.
+      if (lastSyncedJson == null && Object.keys(collect()).length > 0) schedulePush();
       supa.channel('app_state_' + appKey)
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.' + appKey,
@@ -146,9 +150,18 @@
           applyRemote(payload.new.data);
         })
         .subscribe();
+      // Safety net: the localStorage.setItem patch above does NOT take effect
+      // in Firefox (Storage rejects method overrides), so change-driven pushes
+      // never fire there. Poll instead — pushNow() self-dedupes via
+      // lastSyncedJson and the empty-state guard, so it only writes on change.
+      setInterval(pushNow, 1500);
     })();
     window.addEventListener('beforeunload', flushOnUnload);
     window.addEventListener('pagehide', flushOnUnload);
     window.addEventListener('storage', (e) => { if (e.key && matches(e.key)) schedulePush(); });
+    // Pull the latest when the tab regains focus so a device shows changes made
+    // elsewhere without a manual refresh (works even if realtime is disabled).
+    window.addEventListener('focus', pullNow);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) pullNow(); });
   };
 })();
