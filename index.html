@@ -1691,6 +1691,11 @@ body.modal-open { overflow: hidden; }
 
     // Calendar: month nav + day selection (opens the modal).
     cal.addEventListener('click', (e) => {
+      // Keep the outside-click handler below from closing the calendar: a nav
+      // click triggers renderCalendar(), which rebuilds cal.innerHTML and so
+      // detaches e.target before the document handler runs — its
+      // closest('#browseWrap') would then return null and collapse the popup.
+      e.stopPropagation();
       const nav = e.target.closest('[data-cal]');
       if (nav) {
         calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + (nav.dataset.cal === 'next' ? 1 : -1), 1);

@@ -53,6 +53,18 @@
     }
     const origSet = localStorage.setItem.bind(localStorage);
     const origRemove = localStorage.removeItem.bind(localStorage);
+    // Marker recording the snapshot we last agreed on with the cloud. Persisted
+    // (not just held in memory) so it survives reloads: a pull only overwrites
+    // local data when the cloud differs from this marker, so without it every
+    // reload would treat the cloud as authoritative and could clobber a local
+    // change that hadn't finished uploading yet. The key is plain (not a synced
+    // prefix), so it never uploads, and it is wiped by lifeosPurgeAppData() on
+    // sign-out / account switch — keeping the multi-account guards intact.
+    const MARK_KEY = 'lifeos_synced_' + appKey;
+    function setSynced(json) {
+      lastSyncedJson = json;
+      try { if (json == null) origRemove(MARK_KEY); else origSet(MARK_KEY, json); } catch (e) {}
+    }
     localStorage.setItem = function (k, v) {
       origSet(k, v);
       try { if (!suppressSync && matches(k)) schedulePush(); } catch (e) {}
@@ -94,7 +106,7 @@
           { user_id: uid, key: appKey, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'user_id,key' }
         );
-        if (!error) lastSyncedJson = json;
+        if (!error) setSynced(json);
       } catch (e) {}
     }
     function schedulePush() { if (syncSuspended()) return; clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
@@ -118,7 +130,7 @@
           body: JSON.stringify({ user_id: uid, key: appKey, data: state, updated_at: new Date().toISOString() }),
           keepalive: true,
         }).catch(() => {});
-        lastSyncedJson = json;
+        setSynced(json);
       } catch (e) {}
     }
     async function pullNow() {
@@ -128,13 +140,17 @@
           .from('app_state').select('data').eq('user_id', uid).eq('key', appKey).maybeSingle();
         if (!error && data && data.data && Object.keys(data.data).length > 0) {
           const incoming = JSON.stringify(data.data);
-          if (incoming !== lastSyncedJson) { lastSyncedJson = incoming; applyRemote(data.data); }
+          if (incoming !== lastSyncedJson) { setSynced(incoming); applyRemote(data.data); }
         }
       } catch (e) {}
     }
     (async function init() {
       const user = await window.LifeOS.ready;   // waits until authed + approved
       uid = user.id;
+      // Restore the last-synced marker from a previous load so an in-flight
+      // local change that never finished uploading isn't clobbered by a stale
+      // cloud snapshot on this load.
+      try { lastSyncedJson = localStorage.getItem(MARK_KEY); } catch (e) { lastSyncedJson = null; }
       await pullNow();
       // Cloud had nothing yet but we have local data -> seed it up.
       if (lastSyncedJson == null && Object.keys(collect()).length > 0) schedulePush();
@@ -146,7 +162,7 @@
           if (payload.new.user_id && payload.new.user_id !== uid) return;
           const incoming = JSON.stringify(payload.new.data);
           if (incoming === lastSyncedJson) return;
-          lastSyncedJson = incoming;
+          setSynced(incoming);
           applyRemote(payload.new.data);
         })
         .subscribe();
